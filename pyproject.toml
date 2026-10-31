@@ -7,9 +7,11 @@ authors = [{ name = "julioguirola", email = "julioguirola03@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
     "langchain>=1.4.7",
+    "langchain-community>=0.4.2",
     "langchain-core>=1.7.3",
-    "langchain-openai>=1.7.3",
+    "langchain-nvidia-ai-endpoints>=1.5.0",
     "langgraph>=1.2.19",
+    "pypdf>=6.21.4",
 ]
 
 [project.scripts]
