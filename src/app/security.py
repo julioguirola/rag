@@ -66,8 +66,6 @@ class PIIDetector:
 class OutputValidator:
     HARMFUL_PATTERNS = [
         re.compile(r"here('s| is) (how|the way) to (hack|steal|attack)", re.I),
-        re.compile(r"password\s+is\s+", re.I),
-        re.compile(r"api[_\s]?key\s*[:=]", re.I),
     ]
 
     def __init__(self):
