@@ -1,22 +1,32 @@
 [project]
-name = "rag"
+name = "app"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "julioguirola", email = "julioguirola03@gmail.com" }]
 requires-python = ">=3.14"
 dependencies = [
+    "fastapi>=0.162.0",
     "langchain>=1.4.7",
+    "langchain-chroma>=1.1.0",
     "langchain-community>=0.4.2",
     "langchain-core>=1.7.3",
     "langchain-nvidia-ai-endpoints>=1.5.0",
     "langgraph>=1.2.19",
+    "langsmith>=0.14.16",
+    "pydantic-settings>=2.16.2",
     "pypdf>=6.21.4",
+    "slowapi>=0.1.10",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
-rag = "rag:main"
+app = "app:main"
+tests = "app:tests"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["httpx>=0.28.1", "pytest>=9.2.0"]
