@@ -31,7 +31,7 @@ class ResponseCache:
     def set(self, query: str, response: str) -> None:
         key = self._make_key(query)
         self._cache[key] = {
-            "respose": response,
+            "response": response,
             "timestamp": time.time(),
             "query": query,
         }
