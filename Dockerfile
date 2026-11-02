@@ -16,17 +16,17 @@ COPY --chown=appuser:appuser uv.lock* .
 USER appuser
 
 # Install dependencies (production only)
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
-COPY --chown=appuser:appuser app/ app/
+COPY --chown=appuser:appuser src/app/ app/
 
 # Expose port
 EXPOSE 8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8001/health || exit 1
 
 # Run uvicorn directly from venv (avoids uv re-syncing at runtime)
 CMD [".venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
