@@ -27,8 +27,8 @@ class InputSanitizer:
         return True, None
 
     def clean(self, text: str) -> str:
-        text = re.sub(r"[-] {3,}", "", text)
-        text = re.sub(r"[=] {3,}", "", text)
+        text = re.sub(r"-{3,}", "", text)
+        text = re.sub(r"={3,}", "", text)
         text = text.replace("{{", "{ {").replace("}}", "} }")
         return text.strip()
 
