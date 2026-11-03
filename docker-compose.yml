@@ -8,9 +8,23 @@ services:
     environment:
       - APP_ENV=production
       - LOG_LEVEL=INFO
+    volumes:
+      - ./src/app:/src/app
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
     restart: unless-stopped
+
+  bucket:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
+    ports:
+      - 9000:9000
+      - 9001:9001
+    command: server /tmp/minio --console-address :9001
+
+  cache:
+    image: redis:8.4.0-bookworm
+    ports:
+      - 6379:6379

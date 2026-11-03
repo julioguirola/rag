@@ -1,9 +1,9 @@
 FROM python:3.14-slim
 
-WORKDIR /app
+WORKDIR /src
 
 # Create non-root user early so we can own /app
-RUN useradd --create-home appuser && chown appuser:appuser /app
+RUN useradd --create-home appuser && chown appuser:appuser /src
 
 # Install uv (fast Python package manager)
 RUN pip install uv
@@ -29,4 +29,4 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
 # Run uvicorn directly from venv (avoids uv re-syncing at runtime)
-CMD [".venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD [".venv/bin/uvicorn", "app.main:app","--reload", "--host", "0.0.0.0", "--port", "8001"]

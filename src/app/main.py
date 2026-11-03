@@ -1,8 +1,9 @@
-import time
-import os
 from contextlib import asynccontextmanager
+import os
+import shutil
+import tempfile
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, File, Request, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -15,12 +16,13 @@ from app.models import (
     ChatResponse,
     HealthResponse,
     MetricsResponse,
-    ErrorResponse,
 )
 from app.security import SecurityPipeline
 from app.cache import ResponseCache
 from app.monitoring import get_logger, MetricsCollector, RequestTimer
 from app.agent import ProductionAgent
+
+from langchain_community.document_loaders import TextLoader, PyPDFLoader, Docx2txtLoader
 
 security: SecurityPipeline
 cache: ResponseCache
@@ -251,5 +253,38 @@ async def get_metrics():
 
 @app.get("/cache/stats")
 async def cache_stats():
-    """Cache performance statistics."""
+    """Cache performance statistics"""
     return cache.stats
+
+
+@app.post("/upload")
+async def upload(file: UploadFile = File(...)):
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    "application/pdf"
+    "application/vnd.ms-excel"
+    "application/msword"
+    "text/plain; charset=utf-8"
+    # if (
+    #     file.content_type
+    #     != "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    # ):
+    #     raise HTTPException(status_code=400, detail="Solo se permiten Docx")
+
+    # Guardar en un archivo temporal
+    # with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+    #     shutil.copyfileobj(file.file, tmp)
+    #     tmp_path = tmp.name
+
+    # try:
+    #     loader = Docx2txtLoader(tmp_path)
+    #     docs = await loader.aload()  # versión async, no bloquea el event loop
+    # finally:
+    #     os.remove(tmp_path)  # limpiar el temporal siempre
+
+    return {
+        "filename": file.filename,
+        "content_type": file.content_type,
+        # "num_pages": len(docs),
+        # "first_page_preview": docs[0].page_content[:300] if docs else "",
+        # "metadata": docs[0].metadata if docs else {},
+    }
