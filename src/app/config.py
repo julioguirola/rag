@@ -19,6 +19,35 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 300
     max_retries: int = 3
 
+    # MinIO (object storage)
+    minio_host: str = "localhost"
+    minio_port: int = 9000
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_bucket: str = "uploads"
+    minio_secure: bool = False
+
+    # DB
+    postgres_db: str = "db"
+    postgres_user: str = "user"
+    postgres_password: str = "pass"
+
+    db_host: str = "localhost"
+    db_port: int = 5432
+
+    # Redis (queue)
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    upload_queue_name: str = "file_processing_queue"
+
+    @property
+    def minio_endpoint(self) -> str:
+        return f"{self.minio_host}:{self.minio_port}"
+
+    @property
+    def redis_url(self) -> str:
+        return f"redis://{self.redis_host}:{self.redis_port}/0"
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"

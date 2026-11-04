@@ -3,13 +3,32 @@ services:
     build: .
     ports:
       - 8000:8000
-    env_file:
-      - .env
     environment:
-      - APP_ENV=production
-      - LOG_LEVEL=INFO
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - APP_ENV=${APP_ENV}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - RATE_LIMIT=${RATE_LIMIT}
+      - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS}
+      - MAX_RETRIES=${MAX_RETRIES}
+      - LANGSMITH_TRACING=${LANGSMITH_TRACING}
+      - LANGSMITH_ENDPOINT=${LANGSMITH_ENDPOINT}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - LANGSMITH_AGENT_ID=${LANGSMITH_AGENT_ID}
+      - LANGSMITH_AGENT_ENVIRONMENT=${LANGSMITH_AGENT_ENVIRONMENT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - MINIO_HOST=${MINIO_HOST}
+      - MINIO_PORT=${MINIO_PORT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+      - MINIO_SECURE=${MINIO_SECURE}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - UPLOAD_QUEUE_NAME=${UPLOAD_QUEUE_NAME}
     volumes:
       - ./src/app:/src/app
     healthcheck:
