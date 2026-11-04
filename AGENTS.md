@@ -17,10 +17,6 @@ This repository is a RAG (Retrieval-Augmented Generation) project with the follo
 - Backend (Python): use `uv add <package>` to add dependencies (updates `pyproject.toml` and lockfile). Use `uv run` to execute Python commands. Do NOT use `pip install` directly.
 - Frontend (Node): use `pnpm i` (or `pnpm add <package>`) inside `front/`. Do NOT use `npm install` or `yarn`.
 
-## Docker
-
-- The agent MUST NOT run any Docker commands (`docker`, `docker compose`, `docker-compose`, etc.). Docker services (MinIO, Redis, Postgres, etc.) are managed by the user outside the agent.
-
 ## Rules
 
 1. Never edit, create, delete, or rename files under `lessons/` or `advanced/`.
