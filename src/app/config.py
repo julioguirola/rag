@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     minio_secret_key: str = "minioadmin"
     minio_bucket: str = "uploads"
     minio_secure: bool = False
+    # Endpoint público (accesible desde el navegador/frontend) para las presigned URLs.
+    # En Docker, el endpoint interno es `bucket:9000` pero el frontend accede via `localhost:9000`.
+    minio_public_host: str = "localhost"
+    minio_public_port: int = 9000
 
     # DB
     postgres_db: str = "db"
@@ -43,6 +47,11 @@ class Settings(BaseSettings):
     @property
     def minio_endpoint(self) -> str:
         return f"{self.minio_host}:{self.minio_port}"
+
+    @property
+    def minio_public_endpoint(self) -> str:
+        """Endpoint público para generar presigned URLs. Si no se configura, usa el interno."""
+        return f"{self.minio_public_host}:{self.minio_public_port}"
 
     @property
     def redis_url(self) -> str:

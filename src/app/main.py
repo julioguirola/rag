@@ -1,12 +1,13 @@
 from contextlib import asynccontextmanager
-import io
 import json
 import os
 import shutil
 import tempfile
 import uuid
 
-from fastapi import FastAPI, File, Request, HTTPException, UploadFile
+from fastapi import FastAPI, Request, HTTPException
+from pydantic import BaseModel
+from datetime import timedelta
 from fastapi.middleware.cors import CORSMiddleware
 import redis
 from minio import Minio
@@ -296,14 +297,25 @@ ALLOWED_CONTENT_TYPES = {
 }
 
 
-@app.post("/upload")
-async def upload(file: UploadFile = File(...)):
-    """Upload a file: store it in MinIO and enqueue it in Redis for later processing."""
-    content_type = file.content_type or ""
+class PresignedUrlRequest(BaseModel):
+    filename: str
+    content_type: str
 
-    is_allowed = (
-        content_type in ALLOWED_CONTENT_TYPES
-        or content_type.startswith("text/plain")
+
+class UploadCompleteRequest(BaseModel):
+    object_name: str
+    filename: str
+    content_type: str
+    size: int
+
+
+@app.post("/upload/presigned-url")
+async def get_upload_presigned_url(body: PresignedUrlRequest):
+    """Generate a presigned PUT URL so the frontend can upload directly to MinIO (bypassing the backend)."""
+    content_type = body.content_type or ""
+
+    is_allowed = content_type in ALLOWED_CONTENT_TYPES or content_type.startswith(
+        "text/plain"
     )
     if not is_allowed:
         raise HTTPException(
@@ -311,44 +323,52 @@ async def upload(file: UploadFile = File(...)):
             detail=f"Tipo de archivo no permitido: {content_type}",
         )
 
-    data = await file.read()
-    if not data:
-        raise HTTPException(status_code=400, detail="Archivo vacío")
-
     settings = get_settings()
 
     # Unique object name to avoid collisions in the bucket
-    object_name = f"{uuid.uuid4().hex}_{file.filename}"
+    object_name = f"{uuid.uuid4().hex}_{body.filename}"
 
-    # Store the file in MinIO
-    minio_client.put_object(
+    # Generamos la presigned URL con el cliente MinIO interno (red de Docker,
+    # ej. bucket:9000) y luego reemplazamos el host por el público (localhost:9000)
+    # para que el navegador del frontend pueda alcanzarlo.
+    upload_url = minio_client.presigned_put_object(
         settings.minio_bucket,
         object_name,
-        io.BytesIO(data),
-        length=len(data),
-        content_type=content_type or "application/octet-stream",
+        expires=timedelta(minutes=15),
     )
+    upload_url = upload_url.replace(settings.minio_endpoint, settings.minio_public_endpoint)
 
-    # Enqueue the file reference in Redis for a future consumer to process
-    payload = {
-        "filename": file.filename,
+    return {
+        "upload_url": upload_url,
+        "object_name": object_name,
+        "filename": body.filename,
         "content_type": content_type,
         "bucket": settings.minio_bucket,
-        "object_name": object_name,
-        "size": len(data),
+        "expires_in": 900,
+    }
+
+
+@app.post("/upload/complete")
+async def upload_complete(body: UploadCompleteRequest):
+    """Called by the frontend after a successful direct upload to enqueue the file for processing."""
+    settings = get_settings()
+
+    payload = {
+        "filename": body.filename,
+        "content_type": body.content_type,
+        "bucket": settings.minio_bucket,
+        "object_name": body.object_name,
+        "size": body.size,
     }
     redis_client.lpush(settings.upload_queue_name, json.dumps(payload))
 
     logger.info(
-        "File uploaded and enqueued",
+        "File upload completed and enqueued",
         extra={"extra_data": payload},
     )
 
     return {
-        "filename": file.filename,
-        "content_type": content_type,
-        "bucket": settings.minio_bucket,
-        "object_name": object_name,
-        "size": len(data),
+        "filename": body.filename,
+        "object_name": body.object_name,
         "queued": True,
     }

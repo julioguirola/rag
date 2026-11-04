@@ -26,6 +26,8 @@ services:
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - MINIO_BUCKET=${MINIO_BUCKET}
       - MINIO_SECURE=${MINIO_SECURE}
+      - MINIO_PUBLIC_HOST=${MINIO_PUBLIC_HOST}
+      - MINIO_PUBLIC_PORT=${MINIO_PUBLIC_PORT}
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - UPLOAD_QUEUE_NAME=${UPLOAD_QUEUE_NAME}
@@ -61,6 +63,9 @@ services:
     volumes:
       - ./front/src:/app/front/src
       - ./front/public:/app/front/public
+      - ./front/components:/app/front/components
+      - ./front/hooks:/app/front/hooks
+      - ./front/lib:/app/front/lib
     restart: unless-stopped
 
   postgres:
