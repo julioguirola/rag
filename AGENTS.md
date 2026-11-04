@@ -20,6 +20,7 @@ This repository is a RAG (Retrieval-Augmented Generation) project with the follo
 
 - Backend (Python): use `uv add <package>` to add dependencies (updates `pyproject.toml` and lockfile). Use `uv run` to execute Python commands. Do NOT use `pip install` directly.
 - Frontend (Node): use `pnpm i` (or `pnpm add <package>`) inside `front/`. Do NOT use `npm install` or `yarn`.
+- HTTP client (frontend): use `axios` via the shared client in `front/lib/axios.ts` (`baseURL = VITE_API_URL`). Do not use `fetch` directly in the frontend.
 
 ## UI Components
 

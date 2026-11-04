@@ -8,8 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { api } from "@/lib/axios";
 
 export function UploadForm() {
   const [file, setFile] = useState<File | null>(null);
@@ -39,52 +38,32 @@ export function UploadForm() {
     try {
       // 1. Pedir al backend una URL firmada para subir directamente al almacenamiento (MinIO).
       // El archivo NO pasa por el backend; el backend solo crea el link.
-      const presignedRes = await fetch(`${API_URL}/upload/presigned-url`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: file.name,
-          content_type: file.type,
-        }),
+      const { data } = await api.post("/upload/presigned-url", {
+        filename: file.name,
+        content_type: file.type,
       });
 
-      if (!presignedRes.ok) {
-        const text = await presignedRes.text();
-        throw new Error(
-          text || `Error ${presignedRes.status} al obtener URL de subida`,
-        );
-      }
-
-      const data = await presignedRes.json();
-
       // 2. Subir el archivo directamente a MinIO mediante la URL firmada (no pasa por el backend).
-      const putRes = await fetch(data.upload_url, {
-        method: "PUT",
-        body: file,
+      // La URL es absoluta, por lo que el cliente de axios la usa tal cual (ignora baseURL).
+      await api.put(data.upload_url, file, {
         headers: { "Content-Type": data.content_type },
       });
 
-      if (!putRes.ok) {
-        const text = await putRes.text();
-        throw new Error(
-          text || `Error ${putRes.status} al subir al almacenamiento`,
-        );
-      }
-
       // 3. Notificar al backend para encolar el archivo en el procesamiento posterior (opcional).
-      const completeRes = await fetch(`${API_URL}/upload/complete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      let encolado = true;
+      try {
+        await api.post("/upload/complete", {
           object_name: data.object_name,
           filename: data.filename,
           content_type: data.content_type,
           size: file.size,
-        }),
-      });
-
-      if (!completeRes.ok) {
+        });
+      } catch {
         // El archivo ya se subió correctamente; solo falló el encolado.
+        encolado = false;
+      }
+
+      if (!encolado) {
         setStatus("success");
         setMessage(
           `Subido: ${data.filename} (${file.size} bytes) — aviso: no se encoló para procesamiento`,
