@@ -36,5 +36,6 @@ services:
     ports:
       - 5173:5173
     volumes:
-      - ./front:/app/front
+      - ./front/src:/app/front/src
+      - ./front/public:/app/front/public
     restart: unless-stopped
