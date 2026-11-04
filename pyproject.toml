@@ -15,9 +15,11 @@ dependencies = [
     "langchain-nvidia-ai-endpoints>=1.5.0",
     "langgraph>=1.2.19",
     "langsmith>=0.14.16",
+    "minio>=7.2.20",
     "pydantic-settings>=2.16.2",
     "pypdf>=6.21.4",
     "python-multipart>=0.0.33",
+    "redis>=8.1.0",
     "slowapi>=0.1.10",
     "uvicorn>=0.54.0",
 ]

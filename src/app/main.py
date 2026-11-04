@@ -1,9 +1,14 @@
 from contextlib import asynccontextmanager
+import io
+import json
 import os
 import shutil
 import tempfile
+import uuid
 
 from fastapi import FastAPI, File, Request, HTTPException, UploadFile
+import redis
+from minio import Minio
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -28,12 +33,14 @@ security: SecurityPipeline
 cache: ResponseCache
 metrics: MetricsCollector
 agent: ProductionAgent
+minio_client: Minio
+redis_client: redis.Redis
 logger = get_logger()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global security, cache, metrics, agent
+    global security, cache, metrics, agent, minio_client, redis_client
 
     settings = get_settings()
 
@@ -52,6 +59,19 @@ async def lifespan(app: FastAPI):
     cache = ResponseCache(ttl_seconds=settings.cache_ttl_seconds)
     metrics = MetricsCollector()
     agent = ProductionAgent()
+
+    # MinIO client + bucket
+    minio_client = Minio(
+        settings.minio_endpoint,
+        access_key=settings.minio_access_key,
+        secret_key=settings.minio_secret_key,
+        secure=settings.minio_secure,
+    )
+    if not minio_client.bucket_exists(settings.minio_bucket):
+        minio_client.make_bucket(settings.minio_bucket)
+
+    # Redis client (queue)
+    redis_client = redis.from_url(settings.redis_url, decode_responses=True)
 
     logger.info("All components initialized. Ready to serve requests.")
 
@@ -257,34 +277,68 @@ async def cache_stats():
     return cache.stats
 
 
+ALLOWED_CONTENT_TYPES = {
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/pdf",
+    "application/vnd.ms-excel",
+    "application/msword",
+    "text/plain; charset=utf-8",
+}
+
+
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    "application/pdf"
-    "application/vnd.ms-excel"
-    "application/msword"
-    "text/plain; charset=utf-8"
-    # if (
-    #     file.content_type
-    #     != "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    # ):
-    #     raise HTTPException(status_code=400, detail="Solo se permiten Docx")
+    """Upload a file: store it in MinIO and enqueue it in Redis for later processing."""
+    content_type = file.content_type or ""
 
-    # Guardar en un archivo temporal
-    # with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-    #     shutil.copyfileobj(file.file, tmp)
-    #     tmp_path = tmp.name
+    is_allowed = (
+        content_type in ALLOWED_CONTENT_TYPES
+        or content_type.startswith("text/plain")
+    )
+    if not is_allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido: {content_type}",
+        )
 
-    # try:
-    #     loader = Docx2txtLoader(tmp_path)
-    #     docs = await loader.aload()  # versión async, no bloquea el event loop
-    # finally:
-    #     os.remove(tmp_path)  # limpiar el temporal siempre
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Archivo vacío")
+
+    settings = get_settings()
+
+    # Unique object name to avoid collisions in the bucket
+    object_name = f"{uuid.uuid4().hex}_{file.filename}"
+
+    # Store the file in MinIO
+    minio_client.put_object(
+        settings.minio_bucket,
+        object_name,
+        io.BytesIO(data),
+        length=len(data),
+        content_type=content_type or "application/octet-stream",
+    )
+
+    # Enqueue the file reference in Redis for a future consumer to process
+    payload = {
+        "filename": file.filename,
+        "content_type": content_type,
+        "bucket": settings.minio_bucket,
+        "object_name": object_name,
+        "size": len(data),
+    }
+    redis_client.lpush(settings.upload_queue_name, json.dumps(payload))
+
+    logger.info(
+        "File uploaded and enqueued",
+        extra={"extra_data": payload},
+    )
 
     return {
         "filename": file.filename,
-        "content_type": file.content_type,
-        # "num_pages": len(docs),
-        # "first_page_preview": docs[0].page_content[:300] if docs else "",
-        # "metadata": docs[0].metadata if docs else {},
+        "content_type": content_type,
+        "bucket": settings.minio_bucket,
+        "object_name": object_name,
+        "size": len(data),
+        "queued": True,
     }
