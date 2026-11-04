@@ -28,3 +28,13 @@ services:
     image: redis:8.4.0-bookworm
     ports:
       - 6379:6379
+
+  front:
+    build:
+      context: .
+      dockerfile: Dockerfile.front
+    ports:
+      - 5173:5173
+    volumes:
+      - ./front:/app/front
+    restart: unless-stopped

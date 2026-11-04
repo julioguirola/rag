@@ -1,0 +1,25 @@
+# Dockerfile.front — entorno de desarrollo con hot reload (Vite + React)
+FROM node:24-alpine
+
+WORKDIR /app/front
+
+# Habilitar corepack para usar pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copiar solo los archivos de dependencias primero (caché de capas de Docker)
+COPY front/package.json front/pnpm-lock.yaml ./
+
+# Instalar dependencias
+RUN pnpm install --frozen-lockfile
+
+# Copiar el resto del código fuente
+COPY front/ .
+
+# Puerto del servidor de desarrollo de Vite
+EXPOSE 5173
+
+# Habilitar polling de chokidar para que el hot reload funcione
+# sobre volúmenes bind-mount de Docker (no propagan eventos inotify)
+
+# Ejecutar Vite en modo desarrollo escuchando en todas las interfaces
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]
