@@ -1,0 +1,29 @@
+FROM python:3.14-slim
+
+WORKDIR /src
+
+# Create non-root user early so we can own /app
+RUN useradd --create-home appuser && chown appuser:appuser /src
+
+# Install uv (fast Python package manager)
+RUN pip install uv
+
+# Copy dependency files first (Docker layer caching)
+COPY --chown=appuser:appuser pyproject.toml .
+COPY --chown=appuser:appuser uv.lock* .
+
+# Switch to non-root user before installing deps (so .venv is owned by appuser)
+USER appuser
+
+# Install dependencies (production only)
+RUN uv sync --frozen --no-dev --no-install-project
+
+# Copy application code (the `app` package is needed for imports + processor code)
+COPY --chown=appuser:appuser src/app/ app/
+COPY --chown=appuser:appuser src/processor/ processor/
+
+# Make `app` importable when running processor/main.py directly
+ENV PYTHONPATH=/src
+
+# Run the file processor listener (blocks on the Redis queue)
+CMD [".venv/bin/python", "processor/main.py"]
