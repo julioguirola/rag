@@ -328,15 +328,23 @@ async def get_upload_presigned_url(body: PresignedUrlRequest):
     # Unique object name to avoid collisions in the bucket
     object_name = f"{uuid.uuid4().hex}_{body.filename}"
 
-    # Generamos la presigned URL con el cliente MinIO interno (red de Docker,
-    # ej. bucket:9000) y luego reemplazamos el host por el público (localhost:9000)
-    # para que el navegador del frontend pueda alcanzarlo.
-    upload_url = minio_client.presigned_put_object(
+    # Generamos la presigned URL con un cliente MinIO que use el endpoint
+    # público (localhost:9000) para que la firma coincida con el host al que
+    # el frontend hará PUT. El cliente interno (minio_client, bucket:9000)
+    # sigue usándose para las operaciones reales del backend.
+    signing_client = Minio(
+        settings.minio_public_endpoint,
+        access_key=settings.minio_access_key,
+        secret_key=settings.minio_secret_key,
+        secure=settings.minio_secure,
+        region="us-east-1",
+    )
+
+    upload_url = signing_client.presigned_put_object(
         settings.minio_bucket,
         object_name,
         expires=timedelta(minutes=15),
     )
-    upload_url = upload_url.replace(settings.minio_endpoint, settings.minio_public_endpoint)
 
     return {
         "upload_url": upload_url,

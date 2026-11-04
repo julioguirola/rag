@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     max_retries: int = 3
 
     # MinIO (object storage)
-    minio_host: str = "localhost"
+    minio_host: str = "bucket"
     minio_port: int = 9000
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
