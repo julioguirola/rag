@@ -20,7 +20,6 @@ This repository is a RAG (Retrieval-Augmented Generation) project with the follo
 
 - Backend (Python): use `uv add <package>` to add dependencies (updates `pyproject.toml` and lockfile). Use `uv run` to execute Python commands. Do NOT use `pip install` directly.
 - Frontend (Node): use `pnpm i` (or `pnpm add <package>`) inside `front/`. Do NOT use `npm install` or `yarn`.
-- HTTP client (frontend): use `axios` via the shared client in `front/lib/axios.ts` (`baseURL = VITE_API_URL`). Do not use `fetch` directly in the frontend.
 
 ## UI Components
 
@@ -35,3 +34,4 @@ This repository is a RAG (Retrieval-Augmented Generation) project with the follo
 3. Treat `lessons/` and `advanced/` as read-only reference material for understanding patterns and context.
 4. Before creating a UI component, check `front/components/ui/` first; if missing, prompt the user to install it from shadcn; only create it manually if it is unavailable in both.
 5. The application runs exclusively in Docker; never run, build, or execute it on the host. All commands must run inside the appropriate container.
+6. HTTP client (frontend): use `axios` via the shared client in `front/lib/axios.ts` (`baseURL = VITE_API_URL`). Do not use `fetch` directly in the frontend.
