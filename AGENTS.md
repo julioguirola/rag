@@ -12,13 +12,25 @@ This repository is a RAG (Retrieval-Augmented Generation) project with the follo
 - **`lessons/`** — Contains learning material and example scripts (LangGraph, RAG pipelines, agents, embeddings, etc.). These files are **reference only** for learning and context. They are **NOT** part of the functional project. **Do NOT modify** anything under `lessons/`.
 - **`advanced/`** — Contains advanced RAG technique examples (long context vs RAG, contextual retrieval, late chunking, agentic RAG, GraphRAG, multimodal RAG). These files are **reference only** for learning and context. They are **NOT** part of the functional project. **Do NOT modify** anything under `advanced/`.
 
+## Runtime
+
+- This application runs **exclusively in Docker**. Never run, build, or execute it outside of Docker (only `uv run`, `pnpm dev` are allowed on the host). All other commands must be executed inside the appropriate container.
+
 ## Dependency Management
 
 - Backend (Python): use `uv add <package>` to add dependencies (updates `pyproject.toml` and lockfile). Use `uv run` to execute Python commands. Do NOT use `pip install` directly.
 - Frontend (Node): use `pnpm i` (or `pnpm add <package>`) inside `front/`. Do NOT use `npm install` or `yarn`.
+
+## UI Components
+
+- UI components live in `front/components/ui/`. Before creating any UI component, the agent MUST first check whether it already exists in that directory.
+- If the component does not exist there, ask the user to install it from shadcn (e.g. `npx shadcn@latest add <component>`).
+- If the component is neither present in `front/components/ui/` nor available in shadcn, the agent may create it manually in that directory.
 
 ## Rules
 
 1. Never edit, create, delete, or rename files under `lessons/` or `advanced/`.
 2. All functional changes belong in `src/app/` (backend) or `front/` (frontend).
 3. Treat `lessons/` and `advanced/` as read-only reference material for understanding patterns and context.
+4. Before creating a UI component, check `front/components/ui/` first; if missing, prompt the user to install it from shadcn; only create it manually if it is unavailable in both.
+5. The application runs exclusively in Docker; never run, build, or execute it on the host. All commands must run inside the appropriate container.
