@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     primary_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
     fallback_model: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
 
+    embeddings_model: str = "nvidia/nemotron-3.5-embed-8b"
+    embeddings_dimensions: int = 2000
+
     langsmith_tracing: bool = True
     langsmith_api_key: str = ""
     langsmith_agent_id: str = "learning-rag"

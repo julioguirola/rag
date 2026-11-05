@@ -52,6 +52,20 @@ services:
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - UPLOAD_QUEUE_NAME=${UPLOAD_QUEUE_NAME}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - MINIO_HOST=${MINIO_HOST}
+      - MINIO_PORT=${MINIO_PORT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+      - MINIO_SECURE=${MINIO_SECURE}
+      - MINIO_PUBLIC_HOST=${MINIO_PUBLIC_HOST}
+      - MINIO_PUBLIC_PORT=${MINIO_PUBLIC_PORT}
     volumes:
       - ./src/app:/src/app
       - ./src/processor:/src/processor
@@ -86,7 +100,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:18.4
+    image: pgvector/pgvector:0.8.7-pg18-trixie
     ports:
       - 5674:5432
     environment:
