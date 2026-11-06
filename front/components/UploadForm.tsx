@@ -10,7 +10,11 @@ import {
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/axios";
 
-export function UploadForm() {
+type UploadFormProps = {
+  onUploaded?: () => void;
+};
+
+export function UploadForm({ onUploaded }: UploadFormProps) {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<
     "idle" | "uploading" | "success" | "error"
@@ -68,11 +72,13 @@ export function UploadForm() {
         setMessage(
           `Subido: ${data.filename} (${file.size} bytes) — aviso: no se encoló para procesamiento`,
         );
+        onUploaded?.();
         return;
       }
 
       setStatus("success");
       setMessage(`Subido: ${data.filename} (${file.size} bytes)`);
+      onUploaded?.();
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Error al subir");

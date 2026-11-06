@@ -5,6 +5,7 @@
 This repository is a RAG (Retrieval-Augmented Generation) project with the following layout:
 
 - **Backend:** `src/app/` — the functional backend code (FastAPI app, agents, models, cache, config, security, monitoring).
+- **File processor:** `src/processor/main.py` — processes uploaded files and generates chunk embeddings.
 - **Frontend:** `front/` — the functional frontend code (Vite + React/TS app).
 
 ## Non-functional / Reference-Only Directories

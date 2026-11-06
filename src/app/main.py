@@ -4,14 +4,15 @@ import os
 import shutil
 import tempfile
 import uuid
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Request, HTTPException
-from pydantic import BaseModel
-from datetime import timedelta
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 import redis
 from minio import Minio
 from fastapi.responses import JSONResponse
+import psycopg
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -354,6 +355,85 @@ async def get_upload_presigned_url(body: PresignedUrlRequest):
         "bucket": settings.minio_bucket,
         "expires_in": 900,
     }
+
+
+class DocumentProgress(BaseModel):
+    id: int
+    filename: str
+    processed_chunks: int = Field(ge=0)
+    total_chunks: int = Field(ge=0)
+    progress_percentage: float = Field(ge=0, le=100)
+    status: str
+    created_at: datetime
+
+
+@app.get("/documents", response_model=list[DocumentProgress])
+async def list_documents():
+    """Return uploaded files and their current chunk processing progress."""
+    settings = get_settings()
+
+    try:
+        with psycopg.connect(
+            host=settings.db_host,
+            port=settings.db_port,
+            dbname=settings.postgres_db,
+            user=settings.postgres_user,
+            password=settings.postgres_password,
+        ) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        d.id,
+                        d.filename,
+                        COUNT(c.embedding)::int AS processed_chunks,
+                        COALESCE((d.metadata->>'total_chunks')::int, 0)
+                            AS total_chunks,
+                        d.created_at
+                    FROM documents AS d
+                    LEFT JOIN chunks AS c ON c.document_id = d.id
+                    GROUP BY d.id, d.filename, d.metadata, d.created_at
+                    ORDER BY d.created_at DESC, d.id DESC
+                    """
+                )
+                rows = cursor.fetchall()
+    except psycopg.Error as error:
+        logger.error(
+            "Could not retrieve document progress",
+            extra={"extra_data": {"error": str(error)}},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo consultar el progreso de los archivos.",
+        ) from error
+
+    documents = []
+    for document_id, filename, processed_chunks, total_chunks, created_at in rows:
+        progress = (
+            100.0
+            if total_chunks == 0
+            else min(100.0, processed_chunks / total_chunks * 100)
+        )
+        status = (
+            "completed"
+            if progress >= 100
+            else "processing"
+            if processed_chunks > 0
+            else "queued"
+        )
+        documents.append(
+            DocumentProgress(
+                id=document_id,
+                filename=filename,
+                processed_chunks=processed_chunks,
+                total_chunks=total_chunks,
+                progress_percentage=round(progress, 2),
+                status=status,
+                created_at=created_at,
+            )
+        )
+
+    return documents
 
 
 @app.post("/upload/complete")

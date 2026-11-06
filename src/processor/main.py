@@ -109,11 +109,11 @@ def process_file(payload: dict) -> None:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO documents (filename)
-                VALUES (%s)
+                INSERT INTO documents (filename, metadata)
+                VALUES (%s, %s)
                 RETURNING id
                 """,
-                (filename,),
+                (filename, json.dumps({"total_chunks": len(chunks)})),
             )
             document_row = cursor.fetchone()
             if document_row is None:
@@ -121,15 +121,29 @@ def process_file(payload: dict) -> None:
                     f"No se pudo obtener el id del documento '{filename}'"
                 )
             document_id = document_row[0]
+            connection.commit()
+            embeddings_enabled = True
 
             for chunk_index, chunk in enumerate(chunks):
                 logger.info(f"Procesando chunck {chunk_index}: {chunk[:10]}...")
-                embedding = embeddings_model.embed_query(chunk)
-                if len(embedding) != settings.embeddings_dimensions:
-                    raise ValueError(
-                        f"El modelo devolvió {len(embedding)} dimensiones; "
-                        f"se esperaban {settings.embeddings_dimensions}"
-                    )
+                embedding_value = None
+                if embeddings_enabled:
+                    try:
+                        embedding = embeddings_model.embed_query(chunk)
+                        if len(embedding) != settings.embeddings_dimensions:
+                            raise ValueError(
+                                f"El modelo devolvió {len(embedding)} dimensiones; "
+                                f"se esperaban {settings.embeddings_dimensions}"
+                            )
+                        embedding_value = "[" + ",".join(
+                            str(value) for value in embedding
+                        ) + "]"
+                    except Exception:
+                        embeddings_enabled = False
+                        logger.exception(
+                            "Falló el modelo de embeddings; el chunk actual y "
+                            "los siguientes se guardarán sin embedding"
+                        )
 
                 cursor.execute(
                     """
@@ -140,9 +154,10 @@ def process_file(payload: dict) -> None:
                         document_id,
                         chunk_index,
                         chunk,
-                        "[" + ",".join(str(value) for value in embedding) + "]",
+                        embedding_value,
                     ),
                 )
+                connection.commit()
 
     logger.info(
         "Archivo procesado",
