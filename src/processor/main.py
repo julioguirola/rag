@@ -9,7 +9,7 @@ from tempfile import NamedTemporaryFile
 import redis
 from docx2txt import process as extract_docx_text
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
+from langchain_nvidia_ai_endpoints import Model, NVIDIAEmbeddings, register_model
 from minio import Minio
 from minio.error import S3Error
 from pypdf import PdfReader
@@ -28,6 +28,15 @@ minio_client = Minio(
     access_key=settings.minio_access_key,
     secret_key=settings.minio_secret_key,
     secure=settings.minio_secure,
+)
+
+register_model(
+    Model(
+        id=settings.embeddings_model,
+        model_type="embedding",
+        client="NVIDIAEmbeddings",
+        endpoint="https://integrate.api.nvidia.com/v1/embeddings",
+    )
 )
 embeddings_model = NVIDIAEmbeddings(
     model=settings.embeddings_model,
@@ -78,6 +87,7 @@ def load_file_text(bucket: str, object_name: str, content_type: str) -> str:
 
 def process_file(payload: dict) -> None:
     filename = payload.get("filename", "desconocido")
+    logger.info(f"Procesando: {filename}")
     text = load_file_text(
         payload["bucket"],
         payload["object_name"],
@@ -113,6 +123,7 @@ def process_file(payload: dict) -> None:
             document_id = document_row[0]
 
             for chunk_index, chunk in enumerate(chunks):
+                logger.info(f"Procesando chunck {chunk_index}: {chunk[:10]}...")
                 embedding = embeddings_model.embed_query(chunk)
                 if len(embedding) != settings.embeddings_dimensions:
                     raise ValueError(
