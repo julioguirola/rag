@@ -31,6 +31,7 @@ function App() {
   const [documents, setDocuments] = useState<DocumentProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [retrying, setRetrying] = useState<number[]>([]);
 
   const loadDocuments = useCallback(async () => {
@@ -76,7 +77,7 @@ function App() {
               Consulta el progreso de procesamiento de tus documentos.
             </p>
           </div>
-          <Dialog>
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger render={<Button>Nuevo archivo</Button>} />
             <DialogContent>
               <DialogHeader>
@@ -85,7 +86,12 @@ function App() {
                   El archivo se procesará después de completar la subida.
                 </DialogDescription>
               </DialogHeader>
-              <UploadForm onUploaded={() => void loadDocuments()} />
+              <UploadForm
+                onUploaded={() => {
+                  setUploadDialogOpen(false);
+                  void loadDocuments();
+                }}
+              />
             </DialogContent>
           </Dialog>
         </header>
