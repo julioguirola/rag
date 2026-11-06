@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { RiRefreshLine } from "@remixicon/react";
+import {
+  RiLoader4Line,
+  RiRefreshLine,
+  RiTimeLine,
+} from "@remixicon/react";
 import { UploadForm } from "@/components/UploadForm";
 import { api } from "@/lib/axios";
 import { Button } from "@/components/ui/button";
@@ -19,7 +23,7 @@ type DocumentProgress = {
   processed_chunks: number;
   total_chunks: number;
   progress_percentage: number;
-  status: "queued" | "processing" | "completed";
+  status: "queued" | "processing" | "completed" | "retryable";
   created_at: string;
 };
 
@@ -119,35 +123,41 @@ function App() {
                     </div>
                     <div className="flex w-full shrink-0 items-center gap-3 sm:w-64">
                       <div className="w-full">
-                      <div className="mb-1 flex justify-end text-sm font-medium">
-                        {document.progress_percentage}%
+                        <div className="mb-1 flex justify-end text-sm font-medium">
+                          {document.progress_percentage}%
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                          <div
+                            className="h-full rounded-full bg-primary transition-[width]"
+                            style={{
+                              width: `${document.progress_percentage}%`,
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-secondary">
-                        <div
-                          className="h-full rounded-full bg-primary transition-[width]"
-                          style={{
-                            width: `${document.progress_percentage}%`,
-                          }}
+                      {document.progress_percentage >= 100 ? null : document.status === "queued" ? (
+                        <RiTimeLine
+                          className="size-4 text-muted-foreground"
+                          aria-label="En cola"
                         />
-                      </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        type="button"
-                        title="Reintentar embeddings"
-                        aria-label={`Reintentar embeddings de ${document.filename}`}
-                        disabled={retrying.includes(document.id)}
-                        onClick={() => void retryEmbeddings(document.id)}
-                      >
-                        <RiRefreshLine
-                          className={
-                            retrying.includes(document.id)
-                              ? "animate-spin"
-                              : undefined
-                          }
+                      ) : document.status === "processing" ||
+                        retrying.includes(document.id) ? (
+                        <RiLoader4Line
+                          className="size-4 animate-spin text-muted-foreground"
+                          aria-label="Procesando"
                         />
-                      </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          type="button"
+                          title="Reintentar embeddings"
+                          aria-label={`Reintentar embeddings de ${document.filename}`}
+                          onClick={() => void retryEmbeddings(document.id)}
+                        >
+                          <RiRefreshLine />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

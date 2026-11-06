@@ -2,6 +2,7 @@ import json
 import logging
 import signal
 import sys
+import time
 from io import BytesIO
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -44,6 +45,7 @@ embeddings_model = NVIDIAEmbeddings(
     dimensions=settings.embeddings_dimensions,
 )
 queue_name = settings.upload_queue_name
+file_status_key = "file_processing_status"
 
 running = True
 
@@ -87,6 +89,7 @@ def load_file_text(bucket: str, object_name: str, content_type: str) -> str:
 
 def retry_missing_embeddings(document_id: int) -> None:
     logger.info(f"Reintentando embeddings del documento {document_id}")
+    redis_client.hset(file_status_key, str(document_id), "processing")
     with psycopg.connect(
         host=settings.db_host,
         port=settings.db_port,
@@ -140,7 +143,9 @@ def retry_missing_embeddings(document_id: int) -> None:
                         (embedding_value, chunk_id),
                     )
                 connection.commit()
+                time.sleep(1)
 
+    redis_client.hdel(file_status_key, str(document_id))
     logger.info(
         "Reintento de embeddings finalizado",
         extra={
@@ -189,6 +194,7 @@ def process_file(payload: dict) -> None:
                 )
             document_id = document_row[0]
             connection.commit()
+            redis_client.hset(file_status_key, str(document_id), "processing")
             embeddings_enabled = True
 
             for chunk_index, chunk in enumerate(chunks):
@@ -225,7 +231,9 @@ def process_file(payload: dict) -> None:
                     ),
                 )
                 connection.commit()
+                time.sleep(1)
 
+            redis_client.hdel(file_status_key, str(document_id))
     logger.info(
         "Archivo procesado",
         extra={

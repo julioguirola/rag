@@ -363,8 +363,11 @@ class DocumentProgress(BaseModel):
     processed_chunks: int = Field(ge=0)
     total_chunks: int = Field(ge=0)
     progress_percentage: float = Field(ge=0, le=100)
-    status: str
+    status: bytes | str
     created_at: datetime
+
+
+FILE_STATUS_KEY = "file_processing_status"
 
 
 @app.get("/documents", response_model=list[DocumentProgress])
@@ -381,8 +384,7 @@ async def list_documents():
             password=settings.postgres_password,
         ) as connection:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT
                         d.id,
                         d.filename,
@@ -394,8 +396,7 @@ async def list_documents():
                     LEFT JOIN chunks AS c ON c.document_id = d.id
                     GROUP BY d.id, d.filename, d.metadata, d.created_at
                     ORDER BY d.created_at DESC, d.id DESC
-                    """
-                )
+                    """)
                 rows = cursor.fetchall()
     except psycopg.Error as error:
         logger.error(
@@ -407,6 +408,7 @@ async def list_documents():
             detail="No se pudo consultar el progreso de los archivos.",
         ) from error
 
+    file_statuses = redis_client.hgetall(FILE_STATUS_KEY)
     documents = []
     for document_id, filename, processed_chunks, total_chunks, created_at in rows:
         progress = (
@@ -414,13 +416,9 @@ async def list_documents():
             if total_chunks == 0
             else min(100.0, processed_chunks / total_chunks * 100)
         )
-        status = (
-            "completed"
-            if progress >= 100
-            else "processing"
-            if processed_chunks > 0
-            else "queued"
-        )
+        status = file_statuses.get(str(document_id))
+        if status is None:
+            status = "completed" if progress >= 100 else "retryable"
         documents.append(
             DocumentProgress(
                 id=document_id,
@@ -472,6 +470,7 @@ async def retry_document_embeddings(document_id: int):
         "type": "retry_embeddings",
         "document_id": document_id,
     }
+    redis_client.hset(FILE_STATUS_KEY, str(document_id), "queued")
     redis_client.lpush(settings.upload_queue_name, json.dumps(payload))
     logger.info(
         "Embedding retry enqueued",
