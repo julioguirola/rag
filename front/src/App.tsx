@@ -5,6 +5,7 @@ import {
   RiAddLine,
   RiAlertLine,
   RiCheckLine,
+  RiChat1Line,
   RiDatabase2Line,
   RiFileLine,
   RiFileTextLine,
@@ -58,6 +59,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/axios";
 import { Home } from "@/src/pages/Home";
+import { Chat } from "@/src/pages/Chat";
 
 type DocumentProgress = {
   id: number;
@@ -101,10 +103,11 @@ function DocumentStatus({
 }) {
   const detail = statusDetails[status];
   const Icon = retrying ? RiLoader4Line : detail.icon;
+  const isSpinning = status === "processing" || retrying;
 
   return (
     <Badge variant="outline" className={detail.className}>
-      <Icon className={retrying ? "animate-spin" : undefined} />
+      <Icon className={isSpinning ? "animate-spin" : undefined} />
       {retrying ? "Reintentando" : detail.label}
     </Badge>
   );
@@ -408,12 +411,19 @@ function DocumentsView() {
 function AppRouter() {
   const location = useLocation();
   const isDocumentsRoute = location.pathname === "/archivos";
+  const isChatRoute = location.pathname === "/chat";
   const pageMeta = isDocumentsRoute
     ? {
         eyebrow: "Biblioteca",
         title: "Tus archivos",
         description: "Gestiona tus documentos y su progreso de indexación.",
       }
+    : isChatRoute
+      ? {
+          eyebrow: "Asistente",
+          title: "Chat",
+          description: "Conversa con el agente de IA.",
+        }
     : {
         eyebrow: "Espacio de trabajo",
         title: "Inicio",
@@ -467,6 +477,17 @@ function AppRouter() {
                   <span>Archivos</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={<NavLink to="/chat" />}
+                  isActive={isChatRoute}
+                  tooltip="Chat"
+                  className="h-11 rounded-xl px-3 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground data-active:bg-sidebar-primary/10 data-active:text-sidebar-primary"
+                >
+                  <RiChat1Line className="size-4" />
+                  <span>Chat</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
@@ -510,6 +531,7 @@ function AppRouter() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/archivos" element={<DocumentsView />} />
+            <Route path="/chat" element={<Chat />} />
           </Routes>
         </main>
       </SidebarInset>
