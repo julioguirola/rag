@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { RiRefreshLine } from "@remixicon/react";
 import { UploadForm } from "@/components/UploadForm";
 import { api } from "@/lib/axios";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ function App() {
   const [documents, setDocuments] = useState<DocumentProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retrying, setRetrying] = useState<number[]>([]);
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -38,6 +40,18 @@ function App() {
       setLoading(false);
     }
   }, []);
+
+  const retryEmbeddings = async (documentId: number) => {
+    setRetrying((current) => [...current, documentId]);
+    try {
+      await api.post(`/documents/${documentId}/retry-embeddings`);
+      await loadDocuments();
+    } catch {
+      setError("No se pudo encolar el reintento de embeddings.");
+    } finally {
+      setRetrying((current) => current.filter((id) => id !== documentId));
+    }
+  };
 
   useEffect(() => {
     void loadDocuments();
@@ -103,7 +117,8 @@ function App() {
                         chunks
                       </p>
                     </div>
-                    <div className="w-full shrink-0 sm:w-56">
+                    <div className="flex w-full shrink-0 items-center gap-3 sm:w-64">
+                      <div className="w-full">
                       <div className="mb-1 flex justify-end text-sm font-medium">
                         {document.progress_percentage}%
                       </div>
@@ -115,6 +130,24 @@ function App() {
                           }}
                         />
                       </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        type="button"
+                        title="Reintentar embeddings"
+                        aria-label={`Reintentar embeddings de ${document.filename}`}
+                        disabled={retrying.includes(document.id)}
+                        onClick={() => void retryEmbeddings(document.id)}
+                      >
+                        <RiRefreshLine
+                          className={
+                            retrying.includes(document.id)
+                              ? "animate-spin"
+                              : undefined
+                          }
+                        />
+                      </Button>
                     </div>
                   </div>
                 ))}

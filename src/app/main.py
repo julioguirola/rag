@@ -436,6 +436,50 @@ async def list_documents():
     return documents
 
 
+@app.post("/documents/{document_id}/retry-embeddings")
+async def retry_document_embeddings(document_id: int):
+    """Queue a retry for the chunks of a document that have no embedding."""
+    settings = get_settings()
+
+    try:
+        with psycopg.connect(
+            host=settings.db_host,
+            port=settings.db_port,
+            dbname=settings.postgres_db,
+            user=settings.postgres_user,
+            password=settings.postgres_password,
+        ) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT filename FROM documents WHERE id = %s",
+                    (document_id,),
+                )
+                document = cursor.fetchone()
+    except psycopg.Error as error:
+        logger.error(
+            "Could not find document for embedding retry",
+            extra={"extra_data": {"document_id": document_id, "error": str(error)}},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo consultar el archivo.",
+        ) from error
+
+    if document is None:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado.")
+
+    payload = {
+        "type": "retry_embeddings",
+        "document_id": document_id,
+    }
+    redis_client.lpush(settings.upload_queue_name, json.dumps(payload))
+    logger.info(
+        "Embedding retry enqueued",
+        extra={"extra_data": payload},
+    )
+    return {"document_id": document_id, "queued": True}
+
+
 @app.post("/upload/complete")
 async def upload_complete(body: UploadCompleteRequest):
     """Called by the frontend after a successful direct upload to enqueue the file for processing."""

@@ -85,6 +85,73 @@ def load_file_text(bucket: str, object_name: str, content_type: str) -> str:
     return content.decode("utf-8")
 
 
+def retry_missing_embeddings(document_id: int) -> None:
+    logger.info(f"Reintentando embeddings del documento {document_id}")
+    with psycopg.connect(
+        host=settings.db_host,
+        port=settings.db_port,
+        dbname=settings.postgres_db,
+        user=settings.postgres_user,
+        password=settings.postgres_password,
+    ) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, chunk_index, content
+                FROM chunks
+                WHERE document_id = %s AND embedding IS NULL
+                ORDER BY chunk_index
+                """,
+                (document_id,),
+            )
+            chunks = cursor.fetchall()
+            embeddings_enabled = True
+
+            for chunk_id, chunk_index, chunk in chunks:
+                embedding_value = None
+                if embeddings_enabled:
+                    try:
+                        embedding = embeddings_model.embed_query(chunk)
+                        if len(embedding) != settings.embeddings_dimensions:
+                            raise ValueError(
+                                f"El modelo devolvió {len(embedding)} dimensiones; "
+                                f"se esperaban {settings.embeddings_dimensions}"
+                            )
+                        embedding_value = (
+                            "[" + ",".join(str(value) for value in embedding) + "]"
+                        )
+                    except Exception:
+                        embeddings_enabled = False
+                        logger.exception(
+                            "Falló el reintento de embeddings; los chunks "
+                            "restantes permanecerán sin embedding"
+                        )
+
+                if embedding_value is not None:
+                    logger.info(
+                        f"Chunk {chunk_index} del documento {document_id} procesado"
+                    )
+                    cursor.execute(
+                        """
+                        UPDATE chunks
+                        SET embedding = %s
+                        WHERE id = %s AND embedding IS NULL
+                        """,
+                        (embedding_value, chunk_id),
+                    )
+                connection.commit()
+
+    logger.info(
+        "Reintento de embeddings finalizado",
+        extra={
+            "extra_data": {
+                "document_id": document_id,
+                "chunks": len(chunks),
+            }
+        },
+    )
+
+
 def process_file(payload: dict) -> None:
     filename = payload.get("filename", "desconocido")
     logger.info(f"Procesando: {filename}")
@@ -135,9 +202,9 @@ def process_file(payload: dict) -> None:
                                 f"El modelo devolvió {len(embedding)} dimensiones; "
                                 f"se esperaban {settings.embeddings_dimensions}"
                             )
-                        embedding_value = "[" + ",".join(
-                            str(value) for value in embedding
-                        ) + "]"
+                        embedding_value = (
+                            "[" + ",".join(str(value) for value in embedding) + "]"
+                        )
                     except Exception:
                         embeddings_enabled = False
                         logger.exception(
@@ -180,7 +247,13 @@ while running:
     _, payload_json = item
     try:
         payload = json.loads(payload_json)
-        process_file(payload)
+        is_retry = payload.get("type") == "retry_embeddings" or (
+            "document_id" in payload and "bucket" not in payload
+        )
+        if is_retry:
+            retry_missing_embeddings(payload["document_id"])
+        else:
+            process_file(payload)
     except (
         json.JSONDecodeError,
         TypeError,
