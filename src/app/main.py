@@ -411,12 +411,16 @@ async def list_documents():
     file_statuses = redis_client.hgetall(FILE_STATUS_KEY)
     documents = []
     for document_id, filename, processed_chunks, total_chunks, created_at in rows:
-        progress = (
-            100.0
-            if total_chunks == 0
-            else min(100.0, processed_chunks / total_chunks * 100)
-        )
         status = file_statuses.get(str(document_id))
+        progress = (
+            0.0
+            if total_chunks == 0 and status in {"queued", "processing"}
+            else (
+                100.0
+                if total_chunks == 0
+                else min(100.0, processed_chunks / total_chunks * 100)
+            )
+        )
         if status is None:
             status = "completed" if progress >= 100 else "retryable"
         documents.append(
@@ -484,13 +488,61 @@ async def upload_complete(body: UploadCompleteRequest):
     """Called by the frontend after a successful direct upload to enqueue the file for processing."""
     settings = get_settings()
 
+    try:
+        with psycopg.connect(
+            host=settings.db_host,
+            port=settings.db_port,
+            dbname=settings.postgres_db,
+            user=settings.postgres_user,
+            password=settings.postgres_password,
+        ) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO documents (filename, metadata)
+                    VALUES (%s, %s)
+                    RETURNING id
+                    """,
+                    (
+                        body.filename,
+                        json.dumps(
+                            {
+                                "content_type": body.content_type,
+                                "size": body.size,
+                            }
+                        ),
+                    ),
+                )
+                document_row = cursor.fetchone()
+                if document_row is None:
+                    raise RuntimeError(
+                        f"No se pudo crear el documento '{body.filename}'"
+                    )
+                document_id = document_row[0]
+    except (psycopg.Error, RuntimeError) as error:
+        logger.error(
+            "Could not create document record",
+            extra={
+                "extra_data": {
+                    "filename": body.filename,
+                    "error": str(error),
+                }
+            },
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo registrar el archivo.",
+        ) from error
+
     payload = {
+        "document_id": document_id,
         "filename": body.filename,
         "content_type": body.content_type,
         "bucket": settings.minio_bucket,
         "object_name": body.object_name,
         "size": body.size,
     }
+    redis_client.hset(FILE_STATUS_KEY, str(document_id), "queued")
     redis_client.lpush(settings.upload_queue_name, json.dumps(payload))
 
     logger.info(
@@ -499,6 +551,7 @@ async def upload_complete(body: UploadCompleteRequest):
     )
 
     return {
+        "document_id": document_id,
         "filename": body.filename,
         "object_name": body.object_name,
         "queued": True,

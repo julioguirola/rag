@@ -179,20 +179,23 @@ def process_file(payload: dict) -> None:
         password=settings.postgres_password,
     ) as connection:
         with connection.cursor() as cursor:
+            document_id = payload.get("document_id")
+            if document_id is None:
+                raise RuntimeError(
+                    f"El archivo '{filename}' no tiene un document_id"
+                )
             cursor.execute(
                 """
-                INSERT INTO documents (filename, metadata)
-                VALUES (%s, %s)
-                RETURNING id
+                UPDATE documents
+                SET metadata = metadata || %s::jsonb
+                WHERE id = %s
                 """,
-                (filename, json.dumps({"total_chunks": len(chunks)})),
+                (json.dumps({"total_chunks": len(chunks)}), document_id),
             )
-            document_row = cursor.fetchone()
-            if document_row is None:
+            if cursor.rowcount != 1:
                 raise RuntimeError(
-                    f"No se pudo obtener el id del documento '{filename}'"
+                    f"No se encontró el documento {document_id} para '{filename}'"
                 )
-            document_id = document_row[0]
             connection.commit()
             redis_client.hset(file_status_key, str(document_id), "processing")
             embeddings_enabled = True
