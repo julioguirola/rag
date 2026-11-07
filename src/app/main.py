@@ -108,16 +108,43 @@ def create_chat(title: str) -> int:
         ) from error
 
 
-def save_message(chat_id: int, user_input: str, ai_response: str) -> None:
+def save_message(
+    chat_id: int,
+    user_input: str,
+    ai_response: str,
+    context: list[dict] | None = None,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+    context_usage_percent: float | None = None,
+    output_usage_percent: float | None = None,
+) -> None:
     try:
         with get_database_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    INSERT INTO messages (chat_id, user_input, ai_response)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO messages (
+                        chat_id,
+                        user_input,
+                        ai_response,
+                        input_tokens,
+                        output_tokens,
+                        context_usage_percent,
+                        output_usage_percent,
+                        retrieval_context
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                     """,
-                    (chat_id, user_input, ai_response),
+                    (
+                        chat_id,
+                        user_input,
+                        ai_response,
+                        input_tokens,
+                        output_tokens,
+                        context_usage_percent,
+                        output_usage_percent,
+                        json.dumps(context or []),
+                    ),
                 )
                 cursor.execute(
                     """
@@ -285,7 +312,17 @@ async def get_chat_messages(chat_id: int):
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id, chat_id, user_input, ai_response, created_at
+                    SELECT
+                        id,
+                        chat_id,
+                        user_input,
+                        ai_response,
+                        created_at,
+                        retrieval_context,
+                        input_tokens,
+                        output_tokens,
+                        context_usage_percent,
+                        output_usage_percent
                     FROM messages
                     WHERE chat_id = %s
                     ORDER BY created_at ASC, id ASC
@@ -300,6 +337,11 @@ async def get_chat_messages(chat_id: int):
                 user_input=row[2],
                 ai_response=row[3],
                 created_at=row[4],
+                context=[ContextChunk(**chunk) for chunk in (row[5] or [])],
+                input_tokens=row[6],
+                output_tokens=row[7],
+                context_usage_percent=row[8],
+                output_usage_percent=row[9],
             )
             for row in rows
         ]
@@ -363,7 +405,12 @@ async def chat(request: Request, body: ChatRequest):
             metrics.record_request(latency_ms=0, cache_hit=True)
             if chat_id is None:
                 chat_id = create_chat(cleaned_message)
-            save_message(chat_id, cleaned_message, cached_entry["response"])
+            save_message(
+                chat_id,
+                cleaned_message,
+                cached_entry["response"],
+                context=cached_entry.get("context", []),
+            )
             logger.info(
                 "Cache hit",
                 extra={
@@ -431,7 +478,24 @@ async def chat(request: Request, body: ChatRequest):
     )
     if chat_id is None:
         chat_id = create_chat(cleaned_message)
-    save_message(chat_id, cleaned_message, validated_response)
+    save_message(
+        chat_id,
+        cleaned_message,
+        validated_response,
+        context=context,
+        input_tokens=usage["input_tokens"] if usage else None,
+        output_tokens=usage["output_tokens"] if usage else None,
+        context_usage_percent=(
+            round(input_tokens / settings.context_token_limit * 100, 4)
+            if usage
+            else None
+        ),
+        output_usage_percent=(
+            round(output_tokens / settings.output_token_limit * 100, 4)
+            if usage
+            else None
+        ),
+    )
 
     if security_notes:
         logger.info(

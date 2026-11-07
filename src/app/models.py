@@ -19,18 +19,23 @@ class ChatSummary(BaseModel):
     updated_at: datetime
 
 
+class ContextChunk(BaseModel):
+    filename: str
+    chunk_index: int
+    content: str
+
+
 class StoredMessage(BaseModel):
     id: int
     chat_id: int
     user_input: str
     ai_response: str
     created_at: datetime
-
-
-class ContextChunk(BaseModel):
-    filename: str
-    chunk_index: int
-    content: str
+    context: list[ContextChunk] = Field(default_factory=list)
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    context_usage_percent: float | None = None
+    output_usage_percent: float | None = None
 
 
 class ChatResponse(BaseModel):

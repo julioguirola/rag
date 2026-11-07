@@ -36,11 +36,19 @@ type ChatMessage = {
   outputTokens?: number;
   contextUsagePercent?: number;
   outputUsagePercent?: number;
+  context?: ContextChunk[];
+};
+
+type ContextChunk = {
+  filename: string;
+  chunk_index: number;
+  content: string;
 };
 
 type ChatResponse = {
   chat_id: number;
   response: string;
+  context: ContextChunk[];
   input_tokens: number | null;
   output_tokens: number | null;
   context_usage_percent: number | null;
@@ -51,6 +59,11 @@ type StoredMessage = {
   id: number;
   user_input: string;
   ai_response: string;
+  context: ContextChunk[];
+  input_tokens: number | null;
+  output_tokens: number | null;
+  context_usage_percent: number | null;
+  output_usage_percent: number | null;
 };
 
 export function Chat() {
@@ -90,8 +103,19 @@ export function Chat() {
             id: `${message.id}-assistant`,
             role: "assistant" as const,
             content: message.ai_response,
+            context: message.context,
+            inputTokens: message.input_tokens ?? undefined,
+            outputTokens: message.output_tokens ?? undefined,
+            contextUsagePercent: message.context_usage_percent ?? undefined,
+            outputUsagePercent: message.output_usage_percent ?? undefined,
           },
         ]),
+      );
+      const lastMessage = data.at(-1);
+      setContextLimitReached(
+        lastMessage?.context_usage_percent !== null &&
+          lastMessage?.context_usage_percent !== undefined &&
+          lastMessage.context_usage_percent > 90,
       );
     } catch {
       setError("No se pudo cargar la conversación.");
@@ -153,6 +177,7 @@ export function Chat() {
           outputTokens: data.output_tokens ?? undefined,
           contextUsagePercent: data.context_usage_percent ?? undefined,
           outputUsagePercent: data.output_usage_percent ?? undefined,
+          context: data.context,
         },
       ]);
       setContextLimitReached(
@@ -264,6 +289,35 @@ export function Chat() {
                                 Contexto: {message.contextUsagePercent.toFixed(2)}% ·
                                 salida: {message.outputUsagePercent?.toFixed(2)}%
                               </p>
+                            )}
+                          {message.role === "assistant" &&
+                            message.context &&
+                            message.context.length > 0 && (
+                              <details className="mt-3 border-t border-border/60 pt-2">
+                                <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                                  Contexto recuperado ({message.context.length})
+                                </summary>
+                                <div className="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1 text-xs text-muted-foreground">
+                                  {message.context.map((chunk, index) => (
+                                    <div
+                                      key={`${chunk.filename}-${chunk.chunk_index}`}
+                                      className={`rounded-md border bg-background/60 p-2 ${
+                                        index < 5
+                                          ? "border-green-300 dark:border-green-700"
+                                          : "border-border/60"
+                                      }`}
+                                    >
+                                      <p className="font-medium">
+                                        {chunk.filename} · fragmento{" "}
+                                        {chunk.chunk_index + 1}
+                                      </p>
+                                      <p className="mt-1 whitespace-pre-wrap">
+                                        {chunk.content}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
                             )}
                         </MessageContent>
                       </Message>
