@@ -329,6 +329,7 @@ async def chat(request: Request, body: ChatRequest):
     6. Return response
     """
     with RequestTimer() as timer:
+        settings = get_settings()
         security_notes = []
 
         chat_id = body.chat_id
@@ -405,6 +406,7 @@ async def chat(request: Request, body: ChatRequest):
         response_text = result["response"]
         model_used = result["model_used"]
         context = result["context"]
+        usage = result.get("usage")
 
         # ---- Step 4: Output Validation ----
         validated_response, output_warnings = security.check_output(response_text)
@@ -414,8 +416,12 @@ async def chat(request: Request, body: ChatRequest):
         cache.set(cleaned_message, validated_response, context)
 
     # ---- Step 6: Log & Record Metrics ----
-    input_tokens = int(len(cleaned_message.split()) * 1.3)
-    output_tokens = int(len(validated_response.split()) * 1.3)
+    input_tokens = (
+        usage["input_tokens"] if usage else int(len(cleaned_message.split()) * 1.3)
+    )
+    output_tokens = (
+        usage["output_tokens"] if usage else int(len(validated_response.split()) * 1.3)
+    )
 
     metrics.record_request(
         latency_ms=timer.elapsed_ms,
@@ -458,6 +464,18 @@ async def chat(request: Request, body: ChatRequest):
         cached=False,
         processing_time_ms=round(timer.elapsed_ms, 2),
         security_notes=security_notes,
+        input_tokens=usage["input_tokens"] if usage else None,
+        output_tokens=usage["output_tokens"] if usage else None,
+        context_usage_percent=(
+            round(input_tokens / settings.context_token_limit * 100, 4)
+            if usage
+            else None
+        ),
+        output_usage_percent=(
+            round(output_tokens / settings.output_token_limit * 100, 4)
+            if usage
+            else None
+        ),
     )
 
 

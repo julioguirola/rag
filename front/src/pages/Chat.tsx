@@ -32,11 +32,19 @@ type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  contextUsagePercent?: number;
+  outputUsagePercent?: number;
 };
 
 type ChatResponse = {
   chat_id: number;
   response: string;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  context_usage_percent: number | null;
+  output_usage_percent: number | null;
 };
 
 type StoredMessage = {
@@ -55,6 +63,7 @@ export function Chat() {
   const [isLoading, setIsLoading] = useState(true);
   const [isResponding, setIsResponding] = useState(false);
   const [error, setError] = useState("");
+  const [contextLimitReached, setContextLimitReached] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadChats = async () => {
@@ -93,6 +102,7 @@ export function Chat() {
     setError("");
     setSelectedChatId(null);
     setMessages([]);
+    setContextLimitReached(false);
   };
 
   useEffect(() => {
@@ -139,8 +149,16 @@ export function Chat() {
           id: `${Date.now()}-assistant`,
           role: "assistant",
           content: data.response,
+          inputTokens: data.input_tokens ?? undefined,
+          outputTokens: data.output_tokens ?? undefined,
+          contextUsagePercent: data.context_usage_percent ?? undefined,
+          outputUsagePercent: data.output_usage_percent ?? undefined,
         },
       ]);
+      setContextLimitReached(
+        data.context_usage_percent !== null &&
+          data.context_usage_percent > 90,
+      );
       setSelectedChatId(data.chat_id);
       await loadChats();
     } catch {
@@ -240,6 +258,13 @@ export function Chat() {
                         </MessageAvatar>
                         <MessageContent className={message.role === "user" ? "max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-3 text-primary-foreground sm:max-w-[75%]" : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-4 py-3 sm:max-w-[75%]"}>
                           <p className="whitespace-pre-wrap leading-6">{message.content}</p>
+                          {message.role === "assistant" &&
+                            message.contextUsagePercent !== undefined && (
+                              <p className="mt-2 text-xs text-muted-foreground">
+                                Contexto: {message.contextUsagePercent.toFixed(2)}% ·
+                                salida: {message.outputUsagePercent?.toFixed(2)}%
+                              </p>
+                            )}
                         </MessageContent>
                       </Message>
                     ))}
@@ -256,29 +281,48 @@ export function Chat() {
                 )}
               </MessageGroup>
               {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-              <form onSubmit={sendMessage} className="flex items-end gap-3">
-                <Textarea
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      event.currentTarget.form?.requestSubmit();
-                    }
-                  }}
-                  placeholder="Escribe tu mensaje..."
-                  aria-label="Mensaje para el agente"
-                  disabled={isResponding}
-                  rows={2}
-                  className="max-h-40 min-h-12"
-                />
-                <Button type="submit" size="icon-lg" disabled={isResponding || !draft.trim()} aria-label="Enviar mensaje">
-                  <RiSendPlane2Line />
-                </Button>
-              </form>
-              <p className="text-center text-xs text-muted-foreground">
-                Enter para enviar · Shift + Enter para una nueva línea
-              </p>
+              {contextLimitReached ? (
+                <div className="space-y-3">
+                  <p role="alert" className="text-center text-sm text-destructive">
+                    El contexto de esta conversación supera el 90% del límite
+                    disponible. Inicia un nuevo chat para continuar.
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={startNewChat}
+                    className="mx-auto flex"
+                  >
+                    <RiAddLine />
+                    Nuevo chat
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <form onSubmit={sendMessage} className="flex items-end gap-3">
+                    <Textarea
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          event.currentTarget.form?.requestSubmit();
+                        }
+                      }}
+                      placeholder="Escribe un mensaje..."
+                      aria-label="Mensaje para el agente"
+                      disabled={isResponding}
+                      rows={2}
+                      className="max-h-40 min-h-12"
+                    />
+                    <Button type="submit" size="icon-lg" disabled={isResponding || !draft.trim()} aria-label="Enviar mensaje">
+                      <RiSendPlane2Line />
+                    </Button>
+                  </form>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Enter para enviar · Shift + Enter para una nueva línea
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

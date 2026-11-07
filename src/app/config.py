@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     rate_limit: str = "20/minnute"
     cache_ttl_seconds: int = 300
     max_retries: int = 3
+    context_token_limit: int = 1_000_000
+    output_token_limit: int = 65_536
 
     # MinIO (object storage)
     minio_host: str = "bucket"

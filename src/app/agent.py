@@ -135,8 +135,8 @@ class ProductionAgent:
         )
         prompt = (
             "Answer the question based on the following context. \n\n"
-            "Do not invent or assume information. If the answer is not in the current context, "
-            'say exactly: "I dont know, the answer is not in the current context".\n\n'
+            "Do not invent or assume information. Do not begin the conversation saying 'Based on the context...' or similar. If the answer is not in the current context, "
+            'say exactly: "No se, no tengo acceso a esa informacion".\n\n'
             f"Previous conversation:\n{history_text or '(none)'}\n\n"
             f"Context:\n{context}\n\n"
             f"Question: {message}\n\n"
@@ -150,11 +150,14 @@ class ProductionAgent:
                 "model_used": "",
             }
         )
+        response_message = result["messages"][-1]
+        usage = self._extract_usage(response_message)
 
         return {
-            "response": result["messages"][-1].content,
+            "response": response_message.content,
             "model_used": result.get("model_used", "unknown"),
             "error": result.get("error"),
+            "usage": usage,
             "context": [
                 {
                     "filename": chunk.filename,
@@ -164,3 +167,21 @@ class ProductionAgent:
                 for chunk in retrieved_chunks
             ],
         }
+
+    @staticmethod
+    def _extract_usage(message: BaseMessage) -> dict[str, int] | None:
+        """Normalize token usage exposed by different LangChain integrations."""
+        usage_metadata = getattr(message, "usage_metadata", None) or {}
+        response_metadata = getattr(message, "response_metadata", None) or {}
+        token_usage = response_metadata.get("token_usage", {})
+
+        input_tokens = usage_metadata.get("input_tokens")
+        if input_tokens is None:
+            input_tokens = token_usage.get("prompt_tokens")
+        output_tokens = usage_metadata.get("output_tokens")
+        if output_tokens is None:
+            output_tokens = token_usage.get("completion_tokens")
+
+        if not isinstance(input_tokens, int) or not isinstance(output_tokens, int):
+            return None
+        return {"input_tokens": input_tokens, "output_tokens": output_tokens}

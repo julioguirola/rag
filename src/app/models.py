@@ -41,6 +41,10 @@ class ChatResponse(BaseModel):
     cached: bool = False
     processing_time_ms: float
     security_notes: list[str] = Field(default_factory=list)
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    context_usage_percent: float | None = None
+    output_usage_percent: float | None = None
     timestamp: str = Field(default_factory=lambda: str(datetime.now(timezone.utc)))
 
 
