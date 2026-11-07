@@ -88,7 +88,13 @@ def create_chat(title: str) -> int:
                     "INSERT INTO chats (title) VALUES (%s) RETURNING id",
                     (title,),
                 )
-                chat_id = cursor.fetchone()[0]
+                row = cursor.fetchone()
+                if row is None:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="No se pudo crear el chat.",
+                    )
+                chat_id = row[0]
             connection.commit()
         return chat_id
     except psycopg.Error as error:
@@ -245,21 +251,17 @@ async def list_chats():
     try:
         with get_database_connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT c.id, c.title, c.created_at, c.updated_at
                     FROM chats AS c
                     WHERE EXISTS (
                         SELECT 1 FROM messages AS m WHERE m.chat_id = c.id
                     )
                     ORDER BY c.updated_at DESC, c.id DESC
-                    """
-                )
+                    """)
                 rows = cursor.fetchall()
         return [
-            ChatSummary(
-                id=row[0], title=row[1], created_at=row[2], updated_at=row[3]
-            )
+            ChatSummary(id=row[0], title=row[1], created_at=row[2], updated_at=row[3])
             for row in rows
         ]
     except psycopg.Error as error:
@@ -373,8 +375,7 @@ async def chat(request: Request, body: ChatRequest):
                 response=cached_entry["response"],
                 chat_id=chat_id,
                 context=[
-                    ContextChunk(**chunk)
-                    for chunk in cached_entry.get("context", [])
+                    ContextChunk(**chunk) for chunk in cached_entry.get("context", [])
                 ],
                 # thread_id=body.thread_id,
                 model_used="cache",

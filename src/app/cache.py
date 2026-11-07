@@ -28,9 +28,7 @@ class ResponseCache:
         self._misses += 1
         return None
 
-    def set(
-        self, query: str, response: str, context: list[dict[str, Any]]
-    ) -> None:
+    def set(self, query: str, response: str, context: list[dict[str, Any]]) -> None:
         key = self._make_key(query)
         self._cache[key] = {
             "response": response,
