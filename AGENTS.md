@@ -8,11 +8,6 @@ This repository is a RAG (Retrieval-Augmented Generation) project with the follo
 - **File processor:** `src/processor/main.py` — processes uploaded files and generates chunk embeddings.
 - **Frontend:** `front/` — the functional frontend code (Vite + React/TS app).
 
-## Non-functional / Reference-Only Directories
-
-- **`lessons/`** — Contains learning material and example scripts (LangGraph, RAG pipelines, agents, embeddings, etc.). These files are **reference only** for learning and context. They are **NOT** part of the functional project. **Do NOT modify** anything under `lessons/`.
-- **`advanced/`** — Contains advanced RAG technique examples (long context vs RAG, contextual retrieval, late chunking, agentic RAG, GraphRAG, multimodal RAG). These files are **reference only** for learning and context. They are **NOT** part of the functional project. **Do NOT modify** anything under `advanced/`.
-
 ## Runtime
 
 - This application runs **exclusively in Docker**. Never run, build, or execute it outside of Docker (only `uv run`, `pnpm dev` are allowed on the host). All other commands must be executed inside the appropriate container.
@@ -30,9 +25,7 @@ This repository is a RAG (Retrieval-Augmented Generation) project with the follo
 
 ## Rules
 
-1. Never edit, create, delete, or rename files under `lessons/` or `advanced/`.
-2. All functional changes belong in `src/app/` (backend) or `front/` (frontend).
-3. Treat `lessons/` and `advanced/` as read-only reference material for understanding patterns and context.
-4. Before creating a UI component, check `front/components/ui/` first; if missing, prompt the user to install it from shadcn; only create it manually if it is unavailable in both.
-5. The application runs exclusively in Docker; never run, build, or execute it on the host. All commands must run inside the appropriate container.
-6. HTTP client (frontend): use `axios` via the shared client in `front/lib/axios.ts` (`baseURL = VITE_API_URL`). Do not use `fetch` directly in the frontend.
+1. All functional changes belong in `src/app/` (backend) or `front/` (frontend).
+2. Before creating a UI component, check `front/components/ui/` first; if missing, prompt the user to install it from shadcn; only create it manually if it is unavailable in both.
+3. The application runs exclusively in Docker; never run, build, or execute it on the host. All commands must run inside the appropriate container.
+4. HTTP client (frontend): use `axios` via the shared client in `front/lib/axios.ts` (`baseURL = VITE_API_URL`). Do not use `fetch` directly in the frontend.
