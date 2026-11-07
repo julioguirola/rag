@@ -1,6 +1,6 @@
 import hashlib
 import time
-from typing import Optional
+from typing import Any, Optional
 
 
 class ResponseCache:
@@ -14,7 +14,7 @@ class ResponseCache:
         normalized = query.lower().strip()
         return hashlib.sha256(normalized.encode()).hexdigest()
 
-    def get(self, query: str) -> Optional[str]:
+    def get(self, query: str) -> Optional[dict[str, Any]]:
         key = self._make_key(query)
 
         if key in self._cache:
@@ -28,10 +28,13 @@ class ResponseCache:
         self._misses += 1
         return None
 
-    def set(self, query: str, response: str) -> None:
+    def set(
+        self, query: str, response: str, context: list[dict[str, Any]]
+    ) -> None:
         key = self._make_key(query)
         self._cache[key] = {
             "response": response,
+            "context": context,
             "timestamp": time.time(),
             "query": query,
         }

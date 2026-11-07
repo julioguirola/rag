@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   RiChat1Line,
-  RiInformationLine,
+  RiFileTextLine,
   RiLoader4Line,
   RiRobot2Line,
   RiSendPlane2Line,
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/axios";
 
@@ -25,10 +25,18 @@ type ChatMessage = {
   id: number;
   role: "user" | "assistant";
   content: string;
+  context?: ContextChunk[];
+};
+
+type ContextChunk = {
+  filename: string;
+  chunk_index: number;
+  content: string;
 };
 
 type ChatResponse = {
   response: string;
+  context: ContextChunk[];
 };
 
 export function Chat() {
@@ -36,6 +44,7 @@ export function Chat() {
   const [draft, setDraft] = useState("");
   const [isResponding, setIsResponding] = useState(false);
   const [error, setError] = useState("");
+  const [visibleContext, setVisibleContext] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,7 +71,12 @@ export function Chat() {
       const { data } = await api.post<ChatResponse>("/chat", { message });
       setMessages((current) => [
         ...current,
-        { id: Date.now() + 1, role: "assistant", content: data.response },
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          content: data.response,
+          context: data.context,
+        },
       ]);
     } catch {
       setError("No se pudo obtener una respuesta. Intenta de nuevo.");
@@ -93,14 +107,6 @@ export function Chat() {
         </header>
 
         <Card className="flex min-h-0 flex-1 flex-col border-border/70">
-          <CardHeader className="border-b border-border/60 py-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <RiInformationLine className="size-4 text-primary" />
-              Por ahora, el agente responde con su conocimiento general. El
-              retrieval de tus documentos estará disponible próximamente.
-            </div>
-          </CardHeader>
-
           <CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6">
             <MessageGroup className="min-h-0 flex-1 overflow-y-auto pr-1">
               {messages.length === 0 && !isResponding ? (
@@ -146,6 +152,45 @@ export function Chat() {
                         <p className="whitespace-pre-wrap leading-6">
                           {message.content}
                         </p>
+                        {message.role === "assistant" && message.context && (
+                          <>
+                            <button
+                              type="button"
+                              className="w-fit text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                              onClick={() =>
+                                setVisibleContext((current) =>
+                                  current === message.id ? null : message.id,
+                                )
+                              }
+                              aria-expanded={visibleContext === message.id}
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                <RiFileTextLine className="size-3.5" />
+                                {visibleContext === message.id
+                                  ? "Ocultar contexto"
+                                  : "Ver contexto"}
+                              </span>
+                            </button>
+                            {visibleContext === message.id && (
+                              <div className="max-h-80 overflow-y-auto rounded-lg border border-border/60 bg-background/60 p-3 text-xs">
+                                {message.context.map((chunk, index) => (
+                                  <div
+                                    key={`${chunk.filename}-${chunk.chunk_index}-${index}`}
+                                    className="border-b border-border/50 py-2 last:border-b-0 last:pb-0 first:pt-0"
+                                  >
+                                    <p className="mb-1 flex items-center gap-1 font-medium text-foreground">
+                                      <RiFileTextLine className="size-3.5 text-primary" />
+                                      {chunk.filename}
+                                    </p>
+                                    <p className="whitespace-pre-wrap leading-5 text-muted-foreground">
+                                      {chunk.content}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </MessageContent>
                     </Message>
                   ))}

@@ -24,6 +24,7 @@ from app.models import (
     ChatResponse,
     HealthResponse,
     MetricsResponse,
+    ContextChunk,
 )
 from app.security import SecurityPipeline
 from app.cache import ResponseCache
@@ -165,8 +166,8 @@ async def chat(request: Request, body: ChatRequest):
             )
 
         # ---- Step 2: Cache Lookup ----
-        cached_response = cache.get(cleaned_message)
-        if cached_response is not None:
+        cached_entry = cache.get(cleaned_message)
+        if cached_entry is not None:
             metrics.record_request(latency_ms=0, cache_hit=True)
             logger.info(
                 "Cache hit",
@@ -177,7 +178,11 @@ async def chat(request: Request, body: ChatRequest):
                 },
             )
             return ChatResponse(
-                response=cached_response,
+                response=cached_entry["response"],
+                context=[
+                    ContextChunk(**chunk)
+                    for chunk in cached_entry.get("context", [])
+                ],
                 # thread_id=body.thread_id,
                 model_used="cache",
                 cached=True,
@@ -205,13 +210,14 @@ async def chat(request: Request, body: ChatRequest):
 
         response_text = result["response"]
         model_used = result["model_used"]
+        context = result["context"]
 
         # ---- Step 4: Output Validation ----
         validated_response, output_warnings = security.check_output(response_text)
         security_notes.extend(output_warnings)
 
         # ---- Step 5: Cache Store ----
-        cache.set(cleaned_message, validated_response)
+        cache.set(cleaned_message, validated_response, context)
 
     # ---- Step 6: Log & Record Metrics ----
     input_tokens = int(len(cleaned_message.split()) * 1.3)
@@ -248,6 +254,7 @@ async def chat(request: Request, body: ChatRequest):
 
     return ChatResponse(
         response=validated_response,
+        context=[ContextChunk(**chunk) for chunk in context],
         # thread_id=body.thread_id,
         model_used=model_used,
         cached=False,

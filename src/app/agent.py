@@ -124,7 +124,8 @@ class ProductionAgent:
         Returns: {"response": str, "model_used": str, "error": str | None}
         """
 
-        context = self.retriever.build_context(message)
+        retrieved_chunks = self.retriever.retrieve(message)
+        context = self.retriever.build_context(retrieved_chunks)
         prompt = (
             "Answer the question based on the following context. \n\n"
             "Do not invent or assume information. If the answer is not in the current context, "
@@ -146,4 +147,12 @@ class ProductionAgent:
             "response": result["messages"][-1].content,
             "model_used": result.get("model_used", "unknown"),
             "error": result.get("error"),
+            "context": [
+                {
+                    "filename": chunk.filename,
+                    "chunk_index": chunk.chunk_index,
+                    "content": chunk.content,
+                }
+                for chunk in retrieved_chunks
+            ],
         }

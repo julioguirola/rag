@@ -11,6 +11,7 @@ from app.config import get_settings
 class RetrievedChunk:
     document_id: int
     chunk_index: int
+    filename: str
     content: str
 
 
@@ -56,10 +57,11 @@ class Retriever:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT document_id, chunk_index, content
-                    FROM chunks
+                    SELECT c.document_id, c.chunk_index, d.filename, c.content
+                    FROM chunks AS c
+                    JOIN documents AS d ON d.id = c.document_id
                     WHERE embedding IS NOT NULL
-                    ORDER BY embedding <=> %s::vector
+                    ORDER BY c.embedding <=> %s::vector
                     LIMIT 3
                     """,
                     (embedding_value,),
@@ -68,9 +70,10 @@ class Retriever:
                     RetrievedChunk(
                         document_id=document_id,
                         chunk_index=chunk_index,
+                        filename=filename,
                         content=content,
                     )
-                    for document_id, chunk_index, content in cursor.fetchall()
+                    for document_id, chunk_index, filename, content in cursor.fetchall()
                 ]
 
                 if not nearest_chunks:
@@ -91,10 +94,11 @@ class Retriever:
                 )
                 cursor.execute(
                     sql.SQL("""
-                        SELECT document_id, chunk_index, content
-                        FROM chunks
+                        SELECT c.document_id, c.chunk_index, d.filename, c.content
+                        FROM chunks AS c
+                        JOIN documents AS d ON d.id = c.document_id
                         WHERE ({conditions})
-                        ORDER BY document_id, chunk_index
+                        ORDER BY c.document_id, c.chunk_index
                         """).format(
                         conditions=sql.SQL(" OR ").join(
                             [condition] * len(nearest_chunks)
@@ -106,10 +110,13 @@ class Retriever:
                     RetrievedChunk(
                         document_id=document_id,
                         chunk_index=chunk_index,
+                        filename=filename,
                         content=content,
                     )
-                    for document_id, chunk_index, content in cursor.fetchall()
+                    for document_id, chunk_index, filename, content in cursor.fetchall()
                 ]
 
-    def build_context(self, question: str) -> str:
-        return "\n\n".join(chunk.content for chunk in self.retrieve(question))
+    def build_context(self, chunks: list[RetrievedChunk]) -> str:
+        return "\n\n".join(
+            f"[Archivo: {chunk.filename}]\n{chunk.content}" for chunk in chunks
+        )

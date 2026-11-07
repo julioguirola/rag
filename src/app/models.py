@@ -11,9 +11,16 @@ class ChatRequest(BaseModel):
     )
 
 
+class ContextChunk(BaseModel):
+    filename: str
+    chunk_index: int
+    content: str
+
+
 class ChatResponse(BaseModel):
     response: str
     model_used: str
+    context: list[ContextChunk] = Field(default_factory=list)
     cached: bool = False
     processing_time_ms: float
     security_notes: list[str] = Field(default_factory=list)
