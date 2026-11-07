@@ -62,7 +62,7 @@ class Retriever:
                     JOIN documents AS d ON d.id = c.document_id
                     WHERE embedding IS NOT NULL
                     ORDER BY c.embedding <=> %s::vector
-                    LIMIT 3
+                    LIMIT 5
                     """,
                     (embedding_value,),
                 )
@@ -84,8 +84,8 @@ class Retriever:
                     parameters.extend(
                         [
                             chunk.document_id,
-                            max(0, chunk.chunk_index - 5),
-                            chunk.chunk_index + 5,
+                            max(0, chunk.chunk_index - 2),
+                            chunk.chunk_index + 2,
                         ]
                     )
 
