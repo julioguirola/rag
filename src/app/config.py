@@ -5,7 +5,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     nvidia_api_key: str = ""
     primary_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
-    fallback_model: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+    fallback_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
 
     embeddings_model: str = "nvidia/nemotron-3.5-embed-8b"
     embeddings_dimensions: int = 2000
