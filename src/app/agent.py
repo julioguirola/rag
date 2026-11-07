@@ -7,6 +7,7 @@ from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from langsmith import traceable
 
 from app.config import get_settings
+from app.retriever import Retriever
 
 
 class AgentState(TypedDict):
@@ -34,6 +35,7 @@ class ProductionAgent:
             api_key=settings.nvidia_api_key,
         )
         self.max_retries = settings.max_retries
+        self.retriever = Retriever()
         self.graph = self._build_graph()
 
     def _build_graph(self):
@@ -122,9 +124,18 @@ class ProductionAgent:
         Returns: {"response": str, "model_used": str, "error": str | None}
         """
 
+        context = self.retriever.build_context(message)
+        prompt = (
+            "Answer the question based on the following context. \n\n"
+            "Do not invent or assume information. If the answer is not in the current context, "
+            'say exactly: "I dont know, the answer is not in the current context".\n\n'
+            f"Context:\n{context}\n\n"
+            f"Question: {message}\n\n"
+            "Answer:"
+        )
         result = self.graph.invoke(
             {
-                "messages": [HumanMessage(content=message)],
+                "messages": [HumanMessage(content=prompt)],
                 "error": None,
                 "retry_count": 0,
                 "model_used": "",
