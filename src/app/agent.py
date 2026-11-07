@@ -118,7 +118,9 @@ class ProductionAgent:
         return graph.compile()
 
     @traceable(name="production_agent_invoke")
-    def invoke(self, message: str) -> dict:
+    def invoke(
+        self, message: str, conversation_history: list[tuple[str, str]] | None = None
+    ) -> dict:
         """
         Invoke the agent with a user message.
         Returns: {"response": str, "model_used": str, "error": str | None}
@@ -126,10 +128,16 @@ class ProductionAgent:
 
         retrieved_chunks = self.retriever.retrieve(message)
         context = self.retriever.build_context(retrieved_chunks)
+        history = conversation_history or []
+        history_text = "\n\n".join(
+            f"User: {user_input}\nAssistant: {ai_response}"
+            for user_input, ai_response in history
+        )
         prompt = (
             "Answer the question based on the following context. \n\n"
             "Do not invent or assume information. If the answer is not in the current context, "
             'say exactly: "I dont know, the answer is not in the current context".\n\n'
+            f"Previous conversation:\n{history_text or '(none)'}\n\n"
             f"Context:\n{context}\n\n"
             f"Question: {message}\n\n"
             "Answer:"

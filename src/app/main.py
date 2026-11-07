@@ -22,9 +22,11 @@ from app.config import get_settings
 from app.models import (
     ChatRequest,
     ChatResponse,
+    ChatSummary,
     HealthResponse,
     MetricsResponse,
     ContextChunk,
+    StoredMessage,
 )
 from app.security import SecurityPipeline
 from app.cache import ResponseCache
@@ -40,6 +42,116 @@ agent: ProductionAgent
 minio_client: Minio
 redis_client: redis.Redis
 logger = get_logger()
+
+
+def get_database_connection():
+    settings = get_settings()
+    return psycopg.connect(
+        host=settings.db_host,
+        port=settings.db_port,
+        dbname=settings.postgres_db,
+        user=settings.postgres_user,
+        password=settings.postgres_password,
+    )
+
+
+def get_chat_history(chat_id: int) -> list[tuple[str, str]]:
+    try:
+        with get_database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT user_input, ai_response
+                    FROM messages
+                    WHERE chat_id = %s
+                    ORDER BY created_at ASC, id ASC
+                    """,
+                    (chat_id,),
+                )
+                return cursor.fetchall()
+    except psycopg.Error as error:
+        logger.error(
+            "Could not retrieve chat history",
+            extra={"extra_data": {"chat_id": chat_id, "error": str(error)}},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo consultar el historial del chat.",
+        ) from error
+
+
+def create_chat(title: str) -> int:
+    try:
+        with get_database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO chats (title) VALUES (%s) RETURNING id",
+                    (title,),
+                )
+                chat_id = cursor.fetchone()[0]
+            connection.commit()
+        return chat_id
+    except psycopg.Error as error:
+        logger.error(
+            "Could not create chat",
+            extra={"extra_data": {"error": str(error)}},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo crear el chat.",
+        ) from error
+
+
+def save_message(chat_id: int, user_input: str, ai_response: str) -> None:
+    try:
+        with get_database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO messages (chat_id, user_input, ai_response)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (chat_id, user_input, ai_response),
+                )
+                cursor.execute(
+                    """
+                    UPDATE chats
+                    SET updated_at = NOW(),
+                        title = CASE
+                            WHEN title = 'Nuevo chat' THEN LEFT(%s, 120)
+                            ELSE title
+                        END
+                    WHERE id = %s
+                    """,
+                    (user_input, chat_id),
+                )
+            connection.commit()
+    except psycopg.Error as error:
+        logger.error(
+            "Could not save chat message",
+            extra={"extra_data": {"chat_id": chat_id, "error": str(error)}},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo guardar el mensaje.",
+        ) from error
+
+
+def chat_exists(chat_id: int) -> bool:
+    try:
+        with get_database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1 FROM chats WHERE id = %s", (chat_id,))
+                return cursor.fetchone() is not None
+    except psycopg.Error as error:
+        logger.error(
+            "Could not validate chat",
+            extra={"extra_data": {"chat_id": chat_id, "error": str(error)}},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo consultar el chat.",
+        ) from error
 
 
 @asynccontextmanager
@@ -127,6 +239,78 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 
+@app.get("/chats", response_model=list[ChatSummary])
+async def list_chats():
+    """Return saved conversations, most recently updated first."""
+    try:
+        with get_database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT c.id, c.title, c.created_at, c.updated_at
+                    FROM chats AS c
+                    WHERE EXISTS (
+                        SELECT 1 FROM messages AS m WHERE m.chat_id = c.id
+                    )
+                    ORDER BY c.updated_at DESC, c.id DESC
+                    """
+                )
+                rows = cursor.fetchall()
+        return [
+            ChatSummary(
+                id=row[0], title=row[1], created_at=row[2], updated_at=row[3]
+            )
+            for row in rows
+        ]
+    except psycopg.Error as error:
+        logger.error(
+            "Could not list chats",
+            extra={"extra_data": {"error": str(error)}},
+        )
+        raise HTTPException(
+            status_code=503, detail="No se pudieron consultar los chats."
+        ) from error
+
+
+@app.get("/chats/{chat_id}/messages", response_model=list[StoredMessage])
+async def get_chat_messages(chat_id: int):
+    """Return only user inputs and AI responses for a conversation."""
+    if not chat_exists(chat_id):
+        raise HTTPException(status_code=404, detail="Chat no encontrado.")
+
+    try:
+        with get_database_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, chat_id, user_input, ai_response, created_at
+                    FROM messages
+                    WHERE chat_id = %s
+                    ORDER BY created_at ASC, id ASC
+                    """,
+                    (chat_id,),
+                )
+                rows = cursor.fetchall()
+        return [
+            StoredMessage(
+                id=row[0],
+                chat_id=row[1],
+                user_input=row[2],
+                ai_response=row[3],
+                created_at=row[4],
+            )
+            for row in rows
+        ]
+    except psycopg.Error as error:
+        logger.error(
+            "Could not retrieve chat messages",
+            extra={"extra_data": {"chat_id": chat_id, "error": str(error)}},
+        )
+        raise HTTPException(
+            status_code=503, detail="No se pudieron consultar los mensajes."
+        ) from error
+
+
 @app.post("/chat", response_model=ChatResponse)
 @limiter.limit(get_settings().rate_limit)
 @traceable(name="chat_endpoint")
@@ -144,6 +328,11 @@ async def chat(request: Request, body: ChatRequest):
     """
     with RequestTimer() as timer:
         security_notes = []
+
+        chat_id = body.chat_id
+        if chat_id is not None and not chat_exists(chat_id):
+            raise HTTPException(status_code=404, detail="Chat no encontrado.")
+        chat_history = get_chat_history(chat_id) if chat_id is not None else []
 
         # ---- Step 1: Security Check ----
         is_allowed, cleaned_message, notes = security.check_input(body.message)
@@ -166,9 +355,12 @@ async def chat(request: Request, body: ChatRequest):
             )
 
         # ---- Step 2: Cache Lookup ----
-        cached_entry = cache.get(cleaned_message)
+        cached_entry = None if chat_history else cache.get(cleaned_message)
         if cached_entry is not None:
             metrics.record_request(latency_ms=0, cache_hit=True)
+            if chat_id is None:
+                chat_id = create_chat(cleaned_message)
+            save_message(chat_id, cleaned_message, cached_entry["response"])
             logger.info(
                 "Cache hit",
                 extra={
@@ -179,6 +371,7 @@ async def chat(request: Request, body: ChatRequest):
             )
             return ChatResponse(
                 response=cached_entry["response"],
+                chat_id=chat_id,
                 context=[
                     ContextChunk(**chunk)
                     for chunk in cached_entry.get("context", [])
@@ -191,7 +384,7 @@ async def chat(request: Request, body: ChatRequest):
 
         # ---- Step 3: Invoke LangGraph Agent ----
         try:
-            result = agent.invoke(cleaned_message)
+            result = agent.invoke(cleaned_message, chat_history)
         except Exception as e:
             logger.error(
                 f"Agent invocation failed: {e}",
@@ -229,6 +422,9 @@ async def chat(request: Request, body: ChatRequest):
         output_tokens=output_tokens,
         cache_hit=False,
     )
+    if chat_id is None:
+        chat_id = create_chat(cleaned_message)
+    save_message(chat_id, cleaned_message, validated_response)
 
     if security_notes:
         logger.info(
@@ -254,6 +450,7 @@ async def chat(request: Request, body: ChatRequest):
 
     return ChatResponse(
         response=validated_response,
+        chat_id=chat_id,
         context=[ContextChunk(**chunk) for chunk in context],
         # thread_id=body.thread_id,
         model_used=model_used,

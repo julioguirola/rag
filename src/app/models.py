@@ -9,6 +9,22 @@ class ChatRequest(BaseModel):
         max_length=10000,
         description="The user's message to the agent",
     )
+    chat_id: int | None = Field(default=None, gt=0)
+
+
+class ChatSummary(BaseModel):
+    id: int
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class StoredMessage(BaseModel):
+    id: int
+    chat_id: int
+    user_input: str
+    ai_response: str
+    created_at: datetime
 
 
 class ContextChunk(BaseModel):
@@ -19,6 +35,7 @@ class ContextChunk(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+    chat_id: int
     model_used: str
     context: list[ContextChunk] = Field(default_factory=list)
     cached: bool = False

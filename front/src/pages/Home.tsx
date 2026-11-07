@@ -3,8 +3,6 @@ import {
   RiBarChartBoxLine,
   RiChat1Line,
   RiCheckLine,
-  RiFileLine,
-  RiSearchLine,
   RiShieldCheckLine,
   RiSparkling2Line,
   RiUploadCloud2Line,
@@ -21,33 +19,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-const features = [
-  {
-    icon: RiFileLine,
-    eyebrow: "01 · Indexado",
-    title: "Tus documentos, listos para consultar",
-    description:
-      "Sube PDF, DOCX, TXT y más. El contenido se divide en fragmentos y se prepara para una recuperación rápida.",
-    meta: "PDF · DOCX · TXT",
-  },
-  {
-    icon: RiSearchLine,
-    eyebrow: "02 · Búsqueda",
-    title: "Encuentra el contexto adecuado",
-    description:
-      "La búsqueda semántica entiende la intención de tu consulta, incluso cuando no coincide exactamente con el texto.",
-    meta: "Búsqueda vectorial",
-  },
-  {
-    icon: RiChat1Line,
-    eyebrow: "03 · Respuestas",
-    title: "Respuestas fundamentadas",
-    description:
-      "Genera respuestas usando la información recuperada de tus archivos y mantén el foco en tu propia documentación.",
-    meta: "Contexto relevante",
-  },
-];
 
 const workflowSteps = [
   {
@@ -107,9 +78,10 @@ export function Home() {
                   size="lg"
                   variant="outline"
                   nativeButton={false}
-                  render={<Link to="/archivos" />}
+                  render={<Link to="/chat?new=1" />}
                 >
-                  Ver mis archivos
+                  <RiChat1Line />
+                  Nuevo chat
                 </Button>
               </div>
 
@@ -177,84 +149,59 @@ export function Home() {
         </section>
 
         <section>
-          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-primary">
-                Tu espacio de trabajo
-              </p>
-              <h2 className="mt-1 font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-                Todo lo que necesitas para explorar tu conocimiento
-              </h2>
-            </div>
-            <p className="max-w-sm text-sm leading-6 text-muted-foreground sm:text-right">
-              Menos tiempo buscando. Más tiempo entendiendo y tomando
-              decisiones.
-            </p>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            {features.map((feature) => {
-              const Icon = feature.icon;
-
-              return (
-                <Card
-                  className="group h-full border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
-                  key={feature.title}
-                >
-                  <CardHeader>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                        <Icon className="size-5" />
-                      </div>
-                      <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                        {feature.eyebrow}
-                      </span>
-                    </div>
-                    <CardTitle className="mt-5 text-xl">
-                      {feature.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-1">
-                    <CardDescription>{feature.description}</CardDescription>
-                  </CardContent>
-                  <CardFooter className="justify-between border-t border-border/60 pt-5 text-xs font-medium text-muted-foreground">
-                    <span>{feature.meta}</span>
-                    <RiArrowRightLine className="size-4 transition-transform group-hover:translate-x-1" />
-                  </CardFooter>
-                </Card>
-              );
-            })}
+          <p className="text-sm font-semibold text-primary">Tu espacio de trabajo</p>
+          <h2 className="mt-1 font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
+            ¿Qué quieres hacer?
+          </h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Card className="group relative overflow-hidden border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+              <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
+              <CardContent className="flex items-center gap-4 p-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <RiUploadCloud2Line className="size-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Ver mis documentos</CardTitle>
+                  <CardDescription className="mt-1 text-sm">
+                    Consulta tus archivos y revisa su progreso de indexación.
+                  </CardDescription>
+                  <Button
+                    className="mt-3"
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link to="/archivos" />}
+                  >
+                    Ver documentos
+                    <RiArrowRightLine />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="group relative overflow-hidden border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+              <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
+              <CardContent className="flex items-center gap-4 p-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <RiChat1Line className="size-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Nuevo chat</CardTitle>
+                  <CardDescription className="mt-1 text-sm">
+                    Inicia una conversación nueva desde cero.
+                  </CardDescription>
+                  <Button
+                    className="mt-3"
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link to="/chat?new=1" />}
+                  >
+                    Chatear
+                    <RiArrowRightLine />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
-
-        <Card className="relative overflow-hidden border-primary/20 bg-primary text-primary-foreground shadow-lg shadow-primary/10">
-          <div className="pointer-events-none absolute -top-16 right-10 size-48 rounded-full bg-primary-foreground/10 blur-3xl" />
-          <CardContent className="relative flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-            <div className="max-w-2xl">
-              <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
-                <RiSparkling2Line />
-                Empieza en minutos
-              </Badge>
-              <h2 className="mt-4 font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-                Tu próxima respuesta puede estar en tus propios archivos.
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-primary-foreground/75 sm:text-base">
-                Carga un documento y descubre una forma más directa de consultar
-                la información que ya tienes.
-              </p>
-            </div>
-            <Button
-              size="lg"
-              variant="secondary"
-              className="shrink-0"
-              nativeButton={false}
-              render={<Link to="/archivos" />}
-            >
-              Subir mi primer archivo
-              <RiArrowRightLine />
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
