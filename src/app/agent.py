@@ -160,9 +160,11 @@ class ProductionAgent:
             "usage": usage,
             "context": [
                 {
+                    "id": chunk.id,
                     "filename": chunk.filename,
                     "chunk_index": chunk.chunk_index,
                     "content": chunk.content,
+                    "is_primary": chunk.is_primary,
                 }
                 for chunk in retrieved_chunks
             ],

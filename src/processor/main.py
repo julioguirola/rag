@@ -143,7 +143,8 @@ def retry_missing_embeddings(document_id: int) -> None:
                         (embedding_value, chunk_id),
                     )
                 connection.commit()
-                time.sleep(1)
+                if embeddings_enabled:
+                    time.sleep(1)
 
     redis_client.hdel(file_status_key, str(document_id))
     logger.info(
@@ -181,9 +182,7 @@ def process_file(payload: dict) -> None:
         with connection.cursor() as cursor:
             document_id = payload.get("document_id")
             if document_id is None:
-                raise RuntimeError(
-                    f"El archivo '{filename}' no tiene un document_id"
-                )
+                raise RuntimeError(f"El archivo '{filename}' no tiene un document_id")
             cursor.execute(
                 """
                 UPDATE documents
@@ -234,7 +233,8 @@ def process_file(payload: dict) -> None:
                     ),
                 )
                 connection.commit()
-                time.sleep(1)
+                if embeddings_enabled:
+                    time.sleep(1)
 
             redis_client.hdel(file_status_key, str(document_id))
     logger.info(

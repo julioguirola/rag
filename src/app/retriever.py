@@ -9,10 +9,12 @@ from app.config import get_settings
 
 @dataclass(frozen=True)
 class RetrievedChunk:
+    id: int
     document_id: int
     chunk_index: int
     filename: str
     content: str
+    is_primary: bool = False
 
 
 class Retriever:
@@ -57,23 +59,24 @@ class Retriever:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT c.document_id, c.chunk_index, d.filename, c.content
+                    SELECT c.id, c.document_id, c.chunk_index, d.filename, c.content
                     FROM chunks AS c
                     JOIN documents AS d ON d.id = c.document_id
                     WHERE embedding IS NOT NULL
                     ORDER BY c.embedding <=> %s::vector
-                    LIMIT 10
+                    LIMIT 15
                     """,
                     (embedding_value,),
                 )
                 nearest_chunks = [
                     RetrievedChunk(
+                        id=chunk_id,
                         document_id=document_id,
                         chunk_index=chunk_index,
                         filename=filename,
                         content=content,
                     )
-                    for document_id, chunk_index, filename, content in cursor.fetchall()
+                    for chunk_id, document_id, chunk_index, filename, content in cursor.fetchall()
                 ]
 
                 if not nearest_chunks:
@@ -84,8 +87,8 @@ class Retriever:
                     parameters.extend(
                         [
                             chunk.document_id,
-                            max(0, chunk.chunk_index - 3),
-                            chunk.chunk_index + 3,
+                            max(0, chunk.chunk_index - 1),
+                            chunk.chunk_index + 1,
                         ]
                     )
 
@@ -94,11 +97,11 @@ class Retriever:
                 )
                 cursor.execute(
                     sql.SQL("""
-                        SELECT c.document_id, c.chunk_index, d.filename, c.content
+                        SELECT c.id, c.document_id, c.chunk_index, d.filename, c.content
                         FROM chunks AS c
                         JOIN documents AS d ON d.id = c.document_id
                         WHERE ({conditions})
-                        ORDER BY c.document_id, c.chunk_index
+                        ORDER BY c.id
                         """).format(
                         conditions=sql.SQL(" OR ").join(
                             [condition] * len(nearest_chunks)
@@ -106,14 +109,17 @@ class Retriever:
                     ),
                     parameters,
                 )
+                primary_chunk_ids = {chunk.id for chunk in nearest_chunks}
                 return [
                     RetrievedChunk(
+                        id=chunk_id,
                         document_id=document_id,
                         chunk_index=chunk_index,
                         filename=filename,
                         content=content,
+                        is_primary=chunk_id in primary_chunk_ids,
                     )
-                    for document_id, chunk_index, filename, content in cursor.fetchall()
+                    for chunk_id, document_id, chunk_index, filename, content in cursor.fetchall()
                 ]
 
     def build_context(self, chunks: list[RetrievedChunk]) -> str:

@@ -40,9 +40,11 @@ type ChatMessage = {
 };
 
 type ContextChunk = {
+  id?: number;
   filename: string;
   chunk_index: number;
   content: string;
+  is_primary?: boolean;
 };
 
 type ChatResponse = {
@@ -65,6 +67,13 @@ type StoredMessage = {
   context_usage_percent: number | null;
   output_usage_percent: number | null;
 };
+
+const sortContextChunks = (chunks: ContextChunk[]) =>
+  [...chunks].sort(
+    (first, second) =>
+      (first.id ?? Number.MAX_SAFE_INTEGER) -
+      (second.id ?? Number.MAX_SAFE_INTEGER),
+  );
 
 export function Chat() {
   const [searchParams] = useSearchParams();
@@ -194,8 +203,8 @@ export function Chat() {
   };
 
   return (
-    <div className="min-h-full">
-      <div className="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 lg:p-10">
+    <div className="h-[calc(100svh-4rem)] overflow-hidden">
+      <div className="mx-auto flex h-full w-full max-w-7xl flex-col gap-6 overflow-hidden p-4 sm:p-6 lg:p-10">
         <header className="flex flex-col gap-3 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
@@ -251,8 +260,8 @@ export function Chat() {
             </CardContent>
           </Card>
 
-          <Card className="flex min-h-0 flex-col border-border/70">
-            <CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6">
+          <Card className="flex min-h-0 flex-col overflow-hidden border-border/70">
+            <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 sm:p-6">
               <div className="flex items-center justify-between border-b border-border/60 pb-3">
                 <h2 className="truncate font-medium">
                   {chats.find((chat) => chat.id === selectedChatId)?.title ??
@@ -298,11 +307,11 @@ export function Chat() {
                                   Contexto recuperado ({message.context.length})
                                 </summary>
                                 <div className="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1 text-xs text-muted-foreground">
-                                  {message.context.map((chunk, index) => (
+                                  {sortContextChunks(message.context).map((chunk) => (
                                     <div
                                       key={`${chunk.filename}-${chunk.chunk_index}`}
                                       className={`rounded-md border bg-background/60 p-2 ${
-                                        index < 5
+                                        chunk.is_primary
                                           ? "border-green-300 dark:border-green-700"
                                           : "border-border/60"
                                       }`}

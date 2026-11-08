@@ -20,9 +20,11 @@ class ChatSummary(BaseModel):
 
 
 class ContextChunk(BaseModel):
+    id: int | None = None
     filename: str
     chunk_index: int
     content: str
+    is_primary: bool = False
 
 
 class StoredMessage(BaseModel):
